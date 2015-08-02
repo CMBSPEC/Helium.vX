@@ -3,6 +3,8 @@
 // Date: June 2007
 // last modification: July 2015
 //========================================================================================
+// 01.08.2015: Got rid of quantum defect data files. These where also not as accurate.
+//             Now things match the bood of Drake very well.
 // 31.07.2015: - fixed issue with setting up several HeI atoms. This was related to global
 //               variable 'HeI_Atom_njresolved'
 //             - loading additional quadrupole and Triplet-Singlet transitions is now
@@ -15,6 +17,8 @@
 #include <cmath>
 
 #include "HeI_Atom.h"
+#include "He4_Quantum_Defects.h"
+
 #include "routines.h"
 #include "physical_consts.h"
 #include "File.h"
@@ -33,7 +37,9 @@ const double He1s2_ion=198310.6690*const_cl*const_h/const_e;
 //===================================================================================
 // location of the atomic model for helium
 //===================================================================================
-const string path=COSMORECDIR+"./Development/Helium/Helium.Data.lite/";
+//const string path=COSMORECDIR+"./Development/Helium/Helium.Data.lite/";
+//const string path="./Helium.Data.lite/";
+const string path="./Helium.Data/";
 
 //===================================================================================
 // Rydberg for hydrogenic levels in neutral helium
@@ -44,11 +50,6 @@ const double const_EHeI=const_EH_inf/(1.0+const_me_malp);
 // for default data is loaded
 //===================================================================================
 static int HeI_Atom_read_transition_data=1;
-
-//===================================================================================
-// files for level energies
-//===================================================================================
-const string nameE_QD=path+"He4_energies_quantumdefects.dat";
 
 //===================================================================================
 // files for transition rates
@@ -309,45 +310,6 @@ void read_level_energy_DM(string fname, int n, int l, int s, int j, double &E1)
 }
 
 //===================================================================================
-void read_level_energy_QD(string fname, int n, int l, int s, int j, double &E1)
-{
-    // open the file with transition information 
-    inputFile f(fname);
-    
-    skip_header(f, 7);
-    
-    int nv, sv, lv, jv;
-    while(!f.iseof())
-    {
-        // lower level
-        nv=f.get_next_int();
-        sv=f.get_next_int();
-        lv=f.get_next_int();
-        jv=f.get_next_int();
-        
-        if(nv==n && lv==l && sv==s && jv==j) 
-        {
-            E1=f.get_next();  // this energy is in eV and positive relative to the continuum
-            E1=He1s2_ion-E1;
-            f.close();   
-            return;
-        }
-        
-        f.get_next_line();
-    }
-    
-    cout << " read_level_energy_QD:\n no data on level: (" 
-         << n << ", " << l << ", " << s << ", " << j << ") found in file: " 
-         << fname << endl;
-    
-    E1=-6000.0;
-    
-    f.close();   
-    return;
-}
-
-
-//===================================================================================
 void read_transition_add_Quadrupole(string fname, int n, int l, int s, int j, 
                                     vector<Transition_Data_HeI_A> &v, int mflag)
 {
@@ -485,7 +447,7 @@ void Electron_Level_HeI_Singlet::init(int n, int l, int mflag)
     // energies
     //===============================================================================
     // quantum defect values
-    if(ll<=6 && nn>10 && nn<=30) read_level_energy_QD(nameE_QD, nn, ll, 0, ll, DE);
+    if(ll<=6 && nn>10 && nn<=30) DE=He1s2_ion-compute_DEc_QD(nn, ll, 0, ll);
     // hydrogenic energies for all levels l>=7 & n>=11
     else if((ll>6 && nn>10) || (ll<=6 && nn>30)) DE=He1s2_ion-const_EHeI/nn/nn;
     else if((nn==9 && ll==8) || (nn==10 && ll==7) || (nn==10 && ll==8) || (nn==10 && ll==9)) 
@@ -853,7 +815,7 @@ void Electron_Level_HeI_Triplet::init(int n, int l, int j, int mflag)
     // energies
     //===============================================================================
     // quantum defect values
-    if(ll<=6 && nn>10 && nn<=30) read_level_energy_QD(nameE_QD, nn, ll, 1, jj, DE);
+    if(ll<=6 && nn>10 && nn<=30) DE=He1s2_ion-compute_DEc_QD(nn, ll, 1, jj);
     // hydrogenic energies
     else if((ll>6 && nn>10) || (ll<=6 && nn>30)) DE=He1s2_ion-const_EHeI/nn/nn;
     else if((nn==8 && ll==7 && jj==6)) read_level_energy_DM(nameA_TS, nn, ll, 1, jj, DE);
@@ -1231,13 +1193,13 @@ void Electron_Level_HeI_Triplet_no_j::init(int n, int l, int njres, int mflag)
     if(ll<=6 && nn>10 && nn<=30)
     { 
         double dum;
-        read_level_energy_QD(nameE_QD, nn, ll, 1, ll+1, dum);
+        dum=He1s2_ion-compute_DEc_QD(nn, ll, 1, ll+1);
         DE=dum*(2*(ll+1)+1)/(2*ll+1);
         if(l>0)
         {
-            read_level_energy_QD(nameE_QD, nn, ll, 1, ll, dum);
+            dum=He1s2_ion-compute_DEc_QD(nn, ll, 1, ll);
             DE+=dum;
-            read_level_energy_QD(nameE_QD, nn, ll, 1, ll-1, dum);
+            dum=He1s2_ion-compute_DEc_QD(nn, ll, 1, ll-1);
             DE+=dum*(2*(ll-1)+1)/(2*ll+1);
         }
         DE/=3.0;
@@ -2501,9 +2463,6 @@ void Gas_of_HeI_Atoms:: check_transition_data()
     
     for(int k=0; k<(int)nl; k++)
     {
-        //cout << "\n Level " << k << " == (" << Get_n(k) << ", " <<  Get_l(k) << ", " << Get_S(k) << ", " <<  Get_J(k) << ")" << endl;
-        //cout << " Total number of down transitions = " << Get_n_down(k) << endl;
-        
         nucu=Get_nu_ion(k);
         for(int m=0; m<(int)Get_n_down(k); m++)
         {
@@ -2517,16 +2476,21 @@ void Gas_of_HeI_Atoms:: check_transition_data()
             if(fabs(Dnu/val-1.0)>=1.0e-8) 
             {
                 count++;
-                cout << "\n Level " << k << " == (" << Get_n(k) << ", " <<  Get_l(k) << ", " << Get_S(k) << ", " <<  Get_J(k) << ")" << endl;
-                cout << " There is an inconsistency of " << fabs(Dnu/val-1.0) << " in the transition frequency " << val << " Hz to level " 
-                << ip << " == (" << Get_Trans_Data(k, m).np << ", " << Get_Trans_Data(k, m).lp << ", " << Get_Trans_Data(k, m).sp << ", " << Get_Trans_Data(k, m).jp << ")" << endl; 
+                cout << "\n Level " << k << " == (" << Get_n(k) << ", " <<  Get_l(k) << ", "
+                                                    << Get_S(k) << ", " <<  Get_J(k) << ")" << endl;
+                cout << " There is an inconsistency of " << fabs(Dnu/val-1.0)
+                     << " in the transition frequency " << val << " Hz to level "
+                     << ip << " == (" << Get_Trans_Data(k, m).np << ", " << Get_Trans_Data(k, m).lp << ", "
+                                      << Get_Trans_Data(k, m).sp << ", " << Get_Trans_Data(k, m).jp << ")" << endl;
             }
         }
     }
     
     if(count!=0)
     {
-        cout << " There were " << count << " inconsistencies in the transition frequencies. Maybe you want to recompute your Helium model... " << endl;
+        cout << " There were " << count
+             << " inconsistencies in the transition frequencies. Maybe you want to recompute your Helium model... "
+             << endl;
         wait_f_r();
     }
     
