@@ -1,13 +1,21 @@
 //========================================================================================
-// Author: Jens Chluba 
+// Author: Jens Chluba
 // Date: June 2007
 // last modification: July 2015
 //========================================================================================
+// 12.08.2015: Added all the transition rate setups. Data from Drake & Morton is used for
+//             levels with n<=10 (aside from the gaps in that data). Checked that the
+//             number of transitions is the same as well as some explicit transition
+//             values. This made the helium setup significantly faster + reduced the
+//             data that is required.
+// 01.08.2015: Got rid of quantum defect data files. These where also not as accurate.
+//             Now things match the book of Drake very well. Checked that hydrogenic
+//             energies are already pretty accurate at n>=5.
 // 31.07.2015: - fixed issue with setting up several HeI atoms. This was related to global
 //               variable 'HeI_Atom_njresolved'
 //             - loading additional quadrupole and Triplet-Singlet transitions is now
 //               controlled without global functions (more safe...)
-// 30.07.2015: added reduced mass 
+// 30.07.2015: added reduced mass
 //========================================================================================
 
 #ifndef HEI_ATOM_H
@@ -29,7 +37,6 @@ struct Transition_Data_HeI_A
 {
   int np, lp, sp, jp;        // transition (nn, ll) --> (np, lp)
   double gwp;                // weight of level 
-  //double f;                // oscillator strength
   double Dnu;                // transition frequency
   double DE;                 // transition energy
   double A21;                // Einstein A21 coefficient
@@ -42,6 +49,10 @@ struct Transition_Data_HeI_A
 // Class Electron_Level_HeI_Singlet
 //
 //========================================================================================
+class Atom_HeI_Singlet;
+class Atom_HeI_Triplet;
+class Atom_HeI_Triplet_no_j;
+
 class Electron_Level_HeI_Singlet
 {
 private:
@@ -84,7 +95,8 @@ public:
     Electron_Level_HeI_Singlet(int n, int l, int mflag=1);   
     ~Electron_Level_HeI_Singlet();
     void init(int n, int l, int mflag=1);        
-
+    void Set_hydrogenic_transitions(Atom_HeI_Singlet &Sing);
+    
     int Get_n() const { return nn;} 
     int Get_l() const { return ll;} 
     int Get_S() const { return 0;} 
@@ -179,6 +191,8 @@ public:
     Electron_Level_HeI_Triplet(int n, int l, int j, int mflag=1);   
     ~Electron_Level_HeI_Triplet();
     void init(int n, int l, int j, int mflag=1);        
+    void Set_hydrogenic_transitions(Atom_HeI_Triplet &Trip);
+    void Set_hydrogenic_transitions(int np, int lp, Atom_HeI_Triplet &Trip);
 
     int Get_n() const { return nn;} 
     int Get_l() const { return ll;} 
@@ -275,6 +289,7 @@ public:
     Electron_Level_HeI_Triplet_no_j(int n, int l, int njres, int mflag=1);
     ~Electron_Level_HeI_Triplet_no_j();
     void init(int n, int l, int njres, int mflag=1);
+    void Set_hydrogenic_transitions(Atom_HeI_Triplet_no_j &Trip_no_j);
 
     int Get_n() const { return nn;} 
     int Get_l() const { return ll;} 

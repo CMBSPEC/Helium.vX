@@ -3,8 +3,14 @@
 // Date: June 2007
 // last modification: July 2015
 //========================================================================================
+// 12.08.2015: Added all the transition rate setups. Data from Drake & Morton is used for
+//             levels with n<=10 (aside from the gaps in that data). Checked that the
+//             number of transitions is the same as well as some explicit transition
+//             values. This made the helium setup significantly faster + reduced the
+//             data that is required.
 // 01.08.2015: Got rid of quantum defect data files. These where also not as accurate.
-//             Now things match the bood of Drake very well.
+//             Now things match the book of Drake very well. Checked that hydrogenic
+//             energies are already pretty accurate at n>=5.
 // 31.07.2015: - fixed issue with setting up several HeI atoms. This was related to global
 //               variable 'HeI_Atom_njresolved'
 //             - loading additional quadrupole and Triplet-Singlet transitions is now
@@ -18,6 +24,7 @@
 
 #include "HeI_Atom.h"
 #include "He4_Quantum_Defects.h"
+#include "Oscillator_strength.h"
 
 #include "routines.h"
 #include "physical_consts.h"
@@ -52,7 +59,7 @@ const double const_EHeI=const_EH_inf/(1.0+const_me_malp);
 static int HeI_Atom_read_transition_data=1;
 
 //===================================================================================
-// files for transition rates
+// files for transition rates and energies from Drake & Morton
 //===================================================================================
 const string nameA_SS=path+"He4_SS.dat";
 const string nameA_TS=path+"He4_TS.dat";
@@ -63,20 +70,19 @@ const string nameA_add=path+"He4_add.dat";
 //===================================================================================
 // 25th May 2009: added other n^3 P_1 - 1^1 S_0 intecombination lines for 3<=n<=10
 //===================================================================================
-int _HeI_add_Intercomb=0;  // do not change this global variable!
 const string nameA_add_Int=path+"He4_add.intercombination_lines.dat";
 
 //===================================================================================
 // 30th May 2009: added n^1D_2-1^1S_0 quadrupole lines for 3<=n<=10 
 //===================================================================================
-int _HeI_add_Quad=0;       // do not change this global variable!
 const string nameA_add_Quad=path+"He4_Quadrupole_lines.dat";
 
-const string name_DM_gap_S=path+"DM_gap_S.dat";
-const string name_high_S=path+"high_levels_S.dat";
-const string name_DM_gap_T=path+"DM_gap_T.dat";
-const string name_high_T=path+"high_levels_T.dat";
-const string name_high_T_no_j=path+"high_levels_T.no_j.dat";
+//===================================================================================
+// do not change these global variables!
+//===================================================================================
+int _HeI_add_Intercomb=0;
+int _HeI_add_Quad=0;
+Atom_HeI_Triplet *Trip_glob=NULL;
 
 //===================================================================================
 // Read the tables for transition-rates and energies
@@ -122,7 +128,6 @@ void read_transition_inf(string fname, int n, int l, int s, int j,
             dum=f.get_next();
             dd.DE=f.get_next()-dum;
             dd.A21=f.get_next();
-            //dd.f=f.get_next();
             
             // set derived values
             dd.Dnu=dd.DE*const_e/const_h;
@@ -132,114 +137,7 @@ void read_transition_inf(string fname, int n, int l, int s, int j,
             v.push_back(dd);
         }
         
-        f.get_next_line();
-    }
-    
-    f.close();   
-    return;
-}
-
-//===================================================================================
-void read_transition_inf_J(string fname, int n, int l, int s, int j, 
-                           vector<Transition_Data_HeI_A> &v, int check=0)
-{
-    inputFile f(fname);
-    skip_header(f, 7);
-    
-    int nv, sv, lv, jv, line, dont_write_down_again;
-    Transition_Data_HeI_A dd;
-    for(int k=0; k<5; k++) dd.xxx[k]=0.0;
-    
-    while(!f.iseof())
-    {
-        line=f.get_next_int();
-
-        // lower level
-        dd.np=f.get_next_int();
-        dd.sp=f.get_next_int();
-        dd.lp=f.get_next_int();
-        dd.jp=f.get_next_int();
-        
-        // upper level
-        nv=f.get_next_int();
-        sv=f.get_next_int();
-        lv=f.get_next_int();
-        jv=f.get_next_int();
-        
-        if(nv==n && sv==s && lv==l && jv==j) 
-        {
-            dd.Dnu=f.get_next();
-            dd.A21=f.get_next();
-            
-            dont_write_down_again=0;
-            // set derived values
-            dd.DE=dd.Dnu*const_h/const_e;
-            dd.gwp=(2*dd.jp+1);
-            dd.lambda21=const_cl/dd.Dnu; // better use my natural constants
-            
-            if(check==1) 
-                for(int m=0; m<(int)v.size(); m++)
-                    if(v[m].np==dd.np && v[m].lp==dd.lp && v[m].jp==dd.jp 
-                    && v[m].sp==dd.sp && v[m].A21==dd.A21){ dont_write_down_again=1; break; }
-            
-            if(dont_write_down_again==0) v.push_back(dd);
-        }
-        
-        f.get_next_line();
-    }
-    
-    f.close();   
-    return;
-}
-
-//===================================================================================
-void read_transition_inf_J_non_j(string fname, int n, int l, int s, int j, 
-                                 vector<Transition_Data_HeI_A> &v, int check=0)
-{
-    inputFile f(fname);
-    skip_header(f, 7);
-    
-    int nv, sv, lv, jv, line, dont_write_down_again;
-    Transition_Data_HeI_A dd;
-    for(int k=0; k<5; k++) dd.xxx[k]=0.0;
-    
-    while(!f.iseof())
-    {
-        line=f.get_next_int();
-        // lower level
-        dd.np=f.get_next_int();
-        dd.sp=f.get_next_int();
-        dd.lp=f.get_next_int();
-        dd.jp=f.get_next_int();
-        
-        // upper level
-        nv=f.get_next_int();
-        sv=f.get_next_int();
-        lv=f.get_next_int();
-        jv=f.get_next_int();
-        
-        if(nv==n && sv==s && lv==l && jv==j) 
-        {
-            dd.Dnu=f.get_next();
-            dd.A21=f.get_next();
-            
-            dont_write_down_again=0;
-            // set derived values
-            dd.DE=dd.Dnu*const_h/const_e;
-            if(dd.jp==-10) dd.gwp=3*(2*dd.lp+1);
-            else dd.gwp=(2*dd.jp+1);
-            dd.lambda21=const_cl/dd.Dnu; // better use my natural constants
-            
-            if(check==1) 
-                for(int m=0; m<(int)v.size(); m++)
-                    if(v[m].np==dd.np && v[m].lp==dd.lp && v[m].jp==dd.jp 
-                    && v[m].sp==dd.sp && v[m].A21==dd.A21)
-                    { dont_write_down_again=1; break; }
-            
-            if(dont_write_down_again==0) v.push_back(dd);
-        }
-        
-        f.get_next_line();
+        if(!f.iseof()) f.get_next_line();
     }
     
     f.close();   
@@ -296,7 +194,7 @@ void read_level_energy_DM(string fname, int n, int l, int s, int j, double &E1)
             }
         }
         
-        f.get_next_line();
+        if(!f.iseof()) f.get_next_line();
     }
     
     cout << " read_level_energy_DM:\n no data on level: (" 
@@ -344,7 +242,6 @@ void read_transition_add_Quadrupole(string fname, int n, int l, int s, int j,
             dum=f.get_next();
             dd.DE=f.get_next()-dum;
             dd.A21=f.get_next();
-            //dd.f=f.get_next();
             double fv=f.get_next();
             
             // set derived values
@@ -354,14 +251,14 @@ void read_transition_add_Quadrupole(string fname, int n, int l, int s, int j,
 
             dd.A21=FOURPI*2.0*const_PIe2_mec*fv/dd.lambda21/dd.lambda21*1.0/5.0;        
             
-            cout << " (" << nv << " " << lv << " " << sv << " " << jv << ") --> (" 
-                 << dd.np << " " << dd.lp << " " << dd.sp << " " << dd.jp << ") A=" 
-                 << dd.A21 << " " << 1.0/(FOURPI*2.0*const_PIe2_mec*1.0e+16) << endl;
+            if(mflag>=1) cout << " (" << nv << " " << lv << " " << sv << " " << jv << ") --> ("
+                              << dd.np << " " << dd.lp << " " << dd.sp << " " << dd.jp << ") A="
+                              << dd.A21 << " " << 1.0/(FOURPI*2.0*const_PIe2_mec*1.0e+16) << endl;
 
             v.push_back(dd);
         }
         
-        f.get_next_line();
+        if(!f.iseof()) f.get_next_line();
     }
     
     f.close();   
@@ -404,7 +301,6 @@ void read_transition_add_TS(string fname, int n, int l, int s, int j,
             dum=f.get_next();
             dd.DE=f.get_next()-dum;
             dd.A21=f.get_next();
-            //dd.f=f.get_next();
 
             // set derived values
             dd.Dnu=dd.DE*const_e/const_h;
@@ -419,12 +315,246 @@ void read_transition_add_TS(string fname, int n, int l, int s, int j,
             v.push_back(dd);
         }
         
-        f.get_next_line();
+        if(!f.iseof()) f.get_next_line();
     }
     
     f.close();   
     return;
 }
+
+//===================================================================================
+//
+// Added separate setup routines for hydrogenic levels (Aug 2015). These avoid loading
+// data which makes startup slower + dependent on the maximum number of shells that
+// were included by the tables.
+//
+//===================================================================================
+double DnuH_func_Helium(int nup, int nlow)
+{ return const_EH_inf_Hz/(1.0+const_me_malp)*(1.0/nlow/nlow-1.0/nup/nup); }
+
+void check_Hydrogenic_transition(int n, int l, int s, int j, int np, int lp, int sp, int jp,
+                                 double A21, vector<Transition_Data_HeI_A> &v)
+{
+    cout << n << " " << l << " " << s << " " << j << " --> " << np << " " << lp << " " << sp << " " << jp;
+
+    bool was_found=0;
+    for(int m=0; m<(int)v.size(); m++)
+    if(v[m].np==np && v[m].lp==lp && v[m].jp==jp && v[m].sp==sp)
+    {
+        //cout << " found: " << v[m].A21 << " " << A21 << " " << v[m].A21/A21-1.0;
+        if(fabs(v[m].A21/A21-1.0)>=0.005)
+        { cout << " found: " << v[m].A21 << " " << A21 << " " << v[m].A21/A21-1.0; wait_f_r(); }
+        was_found=1;
+        break;
+    }
+    
+    cout << endl;
+    
+    if(!was_found){ cout << " transition not found!" << endl; wait_f_r(); }
+    
+    return;
+}
+
+//===================================================================================
+void compute_Hydrogenic_transition_inf_S(int n, int l,
+                                         Atom_HeI_Singlet &Sing,
+                                         vector<Transition_Data_HeI_A> &v)
+{
+    // simple sanity checks
+    if(l>=n || l<0 || n<1) return;
+
+    Transition_Data_HeI_A dd;
+    
+    for(int k=0; k<5; k++) dd.xxx[k]=0.0;
+    dd.sp=0;
+    
+    double nun=Sing.Level(n, l).Get_nu_ion();
+
+    for(int np=1; np<n; np++)
+        for(int lp=l-1; lp<=l+1; lp+=2)
+            if(lp>=0 && lp<np)
+            {
+                dd.np=np;
+                dd.lp=lp;
+                dd.jp=dd.lp;
+                dd.gwp=2.0*dd.jp+1.0;
+                dd.Dnu=Sing.Level(dd.np, dd.lp).Get_nu_ion()-nun;
+                dd.DE=dd.Dnu*const_h/const_e;
+                dd.lambda21=const_cl/dd.Dnu;
+                
+                double A21H=A_SH(1, const_malpha_mp, n, l, dd.np, dd.lp);
+                double DnuH=DnuH_func_Helium(n, np);
+                dd.A21=A21H*pow(dd.Dnu/DnuH, 3);
+                v.push_back(dd);
+                
+                //check_Hydrogenic_transition(n, l, 0, l, np, lp, 0, lp, dd.A21, v);
+            }
+    
+    //wait_f_r(" done transition singlet ");
+
+    return;
+}
+
+//===================================================================================
+void compute_Hydrogenic_transition_inf_T(int n, int l, int j, int np, int lp,
+                                         Atom_HeI_Triplet &Trip,
+                                         vector<Transition_Data_HeI_A> &v)
+{
+    // simple sanity checks
+    if(np>=n) return;
+    if(l==0 && j!=1) return;
+    if(l>=n || l<0 || n<2 || j<l-1 || j>l+1) return;
+    if(lp>=np || lp<0 || np<2) return;
+    
+    Transition_Data_HeI_A dd;
+    
+    for(int k=0; k<5; k++) dd.xxx[k]=0.0;
+    dd.sp=1;
+    dd.np=np;
+    dd.lp=lp;
+    
+    double nun=Trip.Level(n, l, j).Get_nu_ion();
+    
+    for(int jp=lp-1; jp<=lp+1; jp++)
+    {
+        if(lp==0) jp=0+1;
+        
+        if(lp>=0 && lp<np)
+        {
+            dd.jp=jp;
+            dd.gwp=2.0*dd.jp+1.0;
+            dd.Dnu=Trip.Level(dd.np, dd.lp, dd.jp).Get_nu_ion()-nun;
+            dd.DE=dd.Dnu*const_h/const_e;
+            dd.lambda21=const_cl/dd.Dnu;
+            
+            double A21H=A_SH(1, const_malpha_mp, n, l, dd.np, dd.lp);
+            double DnuH=DnuH_func_Helium(n, np);
+            dd.A21=A21H*pow(dd.Dnu/DnuH, 3)*(2.0*jp+1.0)/(2.0*lp+1.0)/3.0;
+            v.push_back(dd);
+        }
+    }
+    
+    return;
+}
+
+//===================================================================================
+void compute_Hydrogenic_transition_inf_T(int n, int l, int j,
+                                         Atom_HeI_Triplet &Trip,
+                                         vector<Transition_Data_HeI_A> &v)
+{
+    // simple sanity checks
+    if(l==0 && j!=1) return;
+    if(l>=n || l<0 || n<2 || j<l-1 || j>l+1) return;
+
+    Transition_Data_HeI_A dd;
+    
+    for(int k=0; k<5; k++) dd.xxx[k]=0.0;
+    dd.sp=1;
+    
+    double nun=Trip.Level(n, l, j).Get_nu_ion();
+    
+    for(int np=2; np<n; np++) // no np=1 for triplet case
+        for(int lp=l-1; lp<=l+1; lp+=2)
+            for(int jp=lp-1; jp<=lp+1; jp++)
+            {
+                if(lp==0) jp=0+1;
+                
+                if(lp>=0 && lp<np)
+                {
+                    dd.np=np;
+                    dd.lp=lp;
+                    dd.jp=jp;
+                    dd.gwp=2.0*dd.jp+1.0;
+                    dd.Dnu=Trip.Level(dd.np, dd.lp, dd.jp).Get_nu_ion()-nun;
+                    dd.DE=dd.Dnu*const_h/const_e;
+                    dd.lambda21=const_cl/dd.Dnu;
+                    
+                    double A21H=A_SH(1, const_malpha_mp, n, l, dd.np, dd.lp);
+                    double DnuH=DnuH_func_Helium(n, np);
+                    dd.A21=A21H*pow(dd.Dnu/DnuH, 3)*(2.0*jp+1.0)/(2.0*lp+1.0)/3.0;
+                    v.push_back(dd);
+                    
+                    //check_Hydrogenic_transition(n, l, 1, j, np, lp, 1, jp, dd.A21, v);
+                }
+            }
+
+    //wait_f_r(" done transition triplet ");
+    
+    return;
+}
+
+//===================================================================================
+void compute_Hydrogenic_transition_inf_T_no_j(int n, int l,
+                                              Atom_HeI_Triplet_no_j &Trip_no_j,
+                                              vector<Transition_Data_HeI_A> &v)
+{
+    // simple sanity checks
+    if(l>=n || l<0 || n<=Trip_no_j.Get_njres()) return;
+    
+    Transition_Data_HeI_A dd;
+    
+    for(int k=0; k<5; k++) dd.xxx[k]=0.0;
+    dd.sp=1;
+    
+    double nun=Trip_no_j.Level(n, l).Get_nu_ion();
+    
+    // non-j-resolved --> j-resolved
+    if(Trip_glob!=NULL)
+    {
+        for(int np=2; np<=Trip_no_j.Get_njres(); np++)
+            for(int lp=l-1; lp<=l+1; lp+=2)
+                for(int jp=lp-1; jp<=lp+1; jp++)
+                {
+                    if(lp==0) jp=0+1;
+                    
+                    if(lp>=0 && lp<np)
+                    {
+                        dd.np=np;
+                        dd.lp=lp;
+                        dd.jp=jp;
+                        dd.gwp=2.0*dd.jp+1.0;
+                        dd.Dnu=Trip_glob->Level(dd.np, dd.lp, dd.jp).Get_nu_ion()-nun;
+                        dd.DE=dd.Dnu*const_h/const_e;
+                        dd.lambda21=const_cl/dd.Dnu;
+                        
+                        double A21H=A_SH(1, const_malpha_mp, n, l, dd.np, dd.lp);
+                        double DnuH=DnuH_func_Helium(n, np);
+                        dd.A21=A21H*pow(dd.Dnu/DnuH, 3)*(2.0*jp+1.0)/(2.0*lp+1.0)/3.0;
+                        v.push_back(dd);
+                        
+                        //check_Hydrogenic_transition(n, l, 1, -10, np, lp, 1, jp, dd.A21, v);
+                    }
+                }
+    }
+    
+    // non-j-resolved --> non-j-resolved
+    for(int np=Trip_no_j.Get_njres()+1; np<n; np++)
+        for(int lp=l-1; lp<=l+1; lp+=2)
+            if(lp>=0 && lp<np)
+            {
+                dd.np=np;
+                dd.lp=lp;
+                dd.jp=-10;
+                dd.gwp=3.0*(2*dd.lp+1);
+                dd.Dnu=Trip_no_j.Level(dd.np, dd.lp).Get_nu_ion()-nun;
+                dd.DE=dd.Dnu*const_h/const_e;
+                dd.lambda21=const_cl/dd.Dnu;
+                
+                double A21H=A_SH(1, const_malpha_mp, n, l, dd.np, dd.lp);
+                double DnuH=DnuH_func_Helium(n, np);
+                dd.A21=A21H*pow(dd.Dnu/DnuH, 3);
+                v.push_back(dd);
+                
+                //check_Hydrogenic_transition(n, l, 1, -10, np, lp, 1, -10, dd.A21, v);
+            }
+
+    //wait_f_r(" done transition non-j ");
+    
+    return;
+}
+
+//===================================================================================
+//===================================================================================
 
 
 //###################################################################################
@@ -473,17 +603,14 @@ void Electron_Level_HeI_Singlet::init(int n, int l, int mflag)
             read_transition_inf(nameA_SS, nn, ll, 0, ll, A_values);
             read_transition_inf(nameA_TS, nn, ll, 0, ll, A_values);
             read_transition_inf(nameA_add, nn, ll, 0, ll, A_values);
-            //
+
             if(_HeI_add_Quad>=nn && ll==2)
-                read_transition_add_Quadrupole(nameA_add_Quad, nn, ll, 0, ll, A_values, mflag); 
-            // hydrogenic
-            read_transition_inf_J(name_DM_gap_S, nn, ll, 0, ll, A_values);
-            if(nn>10) read_transition_inf_J(name_high_S, nn, ll, 0, ll, A_values);
+                read_transition_add_Quadrupole(nameA_add_Quad, nn, ll, 0, ll, A_values, mflag);
         }
     }
     
     create_Transition_lookup_table();
-    
+
     if(mess_flag>0)
     {
         cout << "\n %##############################################################%" << endl;
@@ -505,6 +632,14 @@ Electron_Level_HeI_Singlet::Electron_Level_HeI_Singlet(int n, int l, int mflag)
 //===================================================================================
 Electron_Level_HeI_Singlet::~Electron_Level_HeI_Singlet()
 { A_values.clear(); }
+
+//===================================================================================
+void Electron_Level_HeI_Singlet::Set_hydrogenic_transitions(Atom_HeI_Singlet &Sing)
+{
+    compute_Hydrogenic_transition_inf_S(nn, ll, Sing, A_values);
+    create_Transition_lookup_table();
+    return;
+}
 
 //===================================================================================
 void Electron_Level_HeI_Singlet::create_Transition_lookup_table()
@@ -719,20 +854,6 @@ double Electron_Level_HeI_Singlet::Get_A21(int np, int lp, int sp, int jp) const
   return 0.0;
 }
 
-/*
-double Electron_Level_HeI_Singlet::Get_f(int np, int lp, int sp, int jp) const
-{
-  for(int i=0; i<(int)A_values.size(); i++) 
-    {
-      if(A_values[i].np==np && A_values[i].lp==lp && A_values[i].sp==sp && A_values[i].jp==jp) 
-          return A_values[i].f;
-      else return 0.0;
-    }
-
-  return 0.0;
-}
-*/
-
 //===================================================================================
 double Electron_Level_HeI_Singlet::Get_nu21(int np, int lp, int sp, int jp) const
 {
@@ -766,7 +887,7 @@ double Electron_Level_HeI_Singlet::Get_lambda21(int np, int lp, int sp, int jp) 
 //===================================================================================
 void Electron_Level_HeI_Singlet::Set_xxx_Transition_Data(int m, int d, double v)
 { 
-  if(d<=5)
+  if(d<5)
     {
       A_values[m].xxx[d]=v; 
     }
@@ -845,10 +966,6 @@ void Electron_Level_HeI_Triplet::init(int n, int l, int j, int mflag)
             read_transition_inf(nameA_add, nn, ll, 1, jj, A_values);
             if(_HeI_add_Intercomb>=nn && nn>2 && ll==1 && jj==1)
                 read_transition_add_TS(nameA_add_Int, nn, ll, 1, jj, A_values, mflag); 
-            // hydrogenic for the gap in Drake and Morton (j-resolved)
-            read_transition_inf_J(name_DM_gap_T, nn, ll, 1, jj, A_values);
-            // hydrogenic
-            if(nn>10) read_transition_inf_J(name_high_T, nn, ll, 1, jj, A_values);
         }
     }
     
@@ -875,6 +992,24 @@ Electron_Level_HeI_Triplet::Electron_Level_HeI_Triplet(int n, int l, int j, int 
 Electron_Level_HeI_Triplet::~Electron_Level_HeI_Triplet()
 { A_values.clear(); }
 
+//===================================================================================
+void Electron_Level_HeI_Triplet::Set_hydrogenic_transitions(Atom_HeI_Triplet &Trip)
+{
+    compute_Hydrogenic_transition_inf_T(nn, ll, jj, Trip, A_values);
+    create_Transition_lookup_table();
+    
+    return;
+}
+
+void Electron_Level_HeI_Triplet::Set_hydrogenic_transitions(int np, int jp, Atom_HeI_Triplet &Trip)
+{
+    compute_Hydrogenic_transition_inf_T(nn, ll, jj, np, jp, Trip, A_values);
+    create_Transition_lookup_table();
+    
+    return;
+}
+
+//===================================================================================
 void Electron_Level_HeI_Triplet::create_Transition_lookup_table()
 {
     ZERO_Data.np=ZERO_Data.sp=ZERO_Data.lp=ZERO_Data.jp=ZERO_Data.gwp=0;
@@ -1095,20 +1230,6 @@ double Electron_Level_HeI_Triplet::Get_A21(int np, int lp, int sp, int jp) const
   return 0.0;
 }
 
-/*
-double Electron_Level_HeI_Triplet::Get_f(int np, int lp, int sp, int jp) const
-{
-  for(int i=0; i<(int)A_values.size(); i++) 
-    {
-      if(A_values[i].np==np && A_values[i].lp==lp && A_values[i].sp==sp && A_values[i].jp==jp) 
-          return A_values[i].f;
-      else return 0.0;
-    }
-
-  return 0.0;
-}
-*/
-
 double Electron_Level_HeI_Triplet::Get_nu21(int np, int lp, int sp, int jp) const
 {
     for(int i=0; i<(int)A_values.size(); i++) 
@@ -1135,7 +1256,7 @@ double Electron_Level_HeI_Triplet::Get_lambda21(int np, int lp, int sp, int jp) 
 
 void Electron_Level_HeI_Triplet::Set_xxx_Transition_Data(int m, int d, double v) 
 { 
-  if(d<=5)
+  if(d<5)
     {
       A_values[m].xxx[d]=v; 
     }
@@ -1217,15 +1338,6 @@ void Electron_Level_HeI_Triplet_no_j::init(int n, int l, int njres, int mflag)
         Eion=He1s2_ion-DE;
         Eion_ergs=Eion*const_e;
         nuion=Eion_ergs/const_h;
-        
-        //===========================================================================
-        // all transitions from that level
-        //===========================================================================
-        if(HeI_Atom_read_transition_data==1)
-        {
-            // hydrogenic
-            read_transition_inf_J_non_j(name_high_T_no_j, nn, ll, 1, -10, A_values);
-        }
     }
     
     create_Transition_lookup_table();
@@ -1250,6 +1362,16 @@ Electron_Level_HeI_Triplet_no_j::Electron_Level_HeI_Triplet_no_j(int n, int l, i
 Electron_Level_HeI_Triplet_no_j::~Electron_Level_HeI_Triplet_no_j()
 { A_values.clear(); }
 
+//===================================================================================
+void Electron_Level_HeI_Triplet_no_j::Set_hydrogenic_transitions(Atom_HeI_Triplet_no_j &Trip_no_j)
+{
+    compute_Hydrogenic_transition_inf_T_no_j(nn, ll, Trip_no_j, A_values);
+    create_Transition_lookup_table();
+    
+    return;
+}
+
+//===================================================================================
 void Electron_Level_HeI_Triplet_no_j::create_Transition_lookup_table()
 {
     ZERO_Data.np=ZERO_Data.sp=ZERO_Data.lp=ZERO_Data.jp=ZERO_Data.gwp=0;
@@ -1477,28 +1599,6 @@ double Electron_Level_HeI_Triplet_no_j::Get_A21(int np, int lp, int sp, int jp) 
   return 0.0;
 }
 
-/*
-double Electron_Level_HeI_Triplet_no_j::Get_f(int np, int lp, int sp, int jp) const
-{
-  if(np<=(int)njresolved)
-    for(int i=0; i<(int)A_values.size(); i++) 
-      {
-    if(A_values[i].np==np && A_values[i].lp==lp && A_values[i].sp==sp && A_values[i].jp==jp) 
-        return A_values[i].f;
-    else return 0.0;
-      }
-  else 
-    for(int i=0; i<A_values.size(); i++) 
-      {
-    if(A_values[i].np==np && A_values[i].lp==lp && A_values[i].sp==sp && A_values[i].jp==-10) 
-        return A_values[i].f;
-    else return 0.0;
-      }
-
-  return 0.0;
-}
-*/
-
 double Electron_Level_HeI_Triplet_no_j::Get_nu21(int np, int lp, int sp, int jp) const
 {
     for(int i=0; i<(int)A_values.size(); i++) 
@@ -1525,7 +1625,7 @@ double Electron_Level_HeI_Triplet_no_j::Get_lambda21(int np, int lp, int sp, int
 
 void Electron_Level_HeI_Triplet_no_j::Set_xxx_Transition_Data(int m, int d, double v) 
 { 
-  if(d<=5)
+  if(d<5)
     {
       A_values[m].xxx[d]=v; 
     }
@@ -1811,8 +1911,26 @@ void Atom_HeI_Singlet::create_Shells()
     // fill with empty shells
     for(int n=0; n<=nShells; n++) Shell.push_back(v);
     // create each shells
-    for(int n=1; n<=nShells; n++) Shell[n].init(n, m); 
+    for(int n=1; n<=nShells; n++) Shell[n].init(n, m);
+    
+    // add hydrogenic transitions for DM singlet gap
+    Level(9, 8).Set_hydrogenic_transitions(*this);
+    Level(10, 7).Set_hydrogenic_transitions(*this);
+    Level(10, 8).Set_hydrogenic_transitions(*this);
+    Level(10, 9).Set_hydrogenic_transitions(*this);
 
+    // add all hydrogenic transitions for levels with n>10
+    for(int n=11; n<=nShells; n++)
+        for(int l=0; l<n; l++) Level(n, l).Set_hydrogenic_transitions(*this);
+    
+    //cout << " testing singlet " << endl;
+    //Level(5, 4).Set_hydrogenic_transitions(*this);
+    //Level(8, 1).Set_hydrogenic_transitions(*this);
+    //Level(8, 4).Set_hydrogenic_transitions(*this);
+    //Level(9, 4).Set_hydrogenic_transitions(*this);
+    //Level(10, 4).Set_hydrogenic_transitions(*this);
+    // for low l-states hydrogenic transitions can be off by a lot!
+  
     return;
 }
 
@@ -1965,6 +2083,27 @@ void Atom_HeI_Triplet::create_Shells()
     for(int n=0; n<=nShells; n++) Shell.push_back(v);
     // create each shells
     for(int n=2; n<=nShells; n++) Shell[n].init(n, m); 
+    
+    // add hydrogenic transitions for DM triplet gap
+    for(int j=7-1; j<=7+1; j++) Level(8, 7, j).Set_hydrogenic_transitions(*this);
+    for(int j=8-1; j<=8+1; j++) Level(9, 8, j).Set_hydrogenic_transitions(*this);
+    for(int j=7-1; j<=7+1; j++) Level(10, 7, j).Set_hydrogenic_transitions(*this);
+    for(int j=8-1; j<=8+1; j++) Level(10, 8, j).Set_hydrogenic_transitions(*this);
+    for(int j=9-1; j<=9+1; j++) Level(10, 9, j).Set_hydrogenic_transitions(*this);
+    // selected transitions
+    for(int j=6-1; j<=6+1; j++) Level(9, 6, j).Set_hydrogenic_transitions(8, 7, *this);
+    for(int j=6-1; j<=6+1; j++) Level(10, 6, j).Set_hydrogenic_transitions(8, 7, *this);
+    
+    // add all hydrogenic transitions for levels with n>10
+    for(int n=11; n<=nShells; n++)
+        for(int l=0; l<n; l++)
+            for(int j=l-1; j<=l+1; j++)
+                Level(n, l, j).Set_hydrogenic_transitions(*this);
+
+    //cout << " testing triplet " << endl;
+    //Level(8, 4, 3).Set_hydrogenic_transitions(*this);
+    //Level(8, 4, 4).Set_hydrogenic_transitions(*this);
+    //Level(8, 4, 5).Set_hydrogenic_transitions(*this);
     
     return;
 }
@@ -2146,6 +2285,10 @@ void Atom_HeI_Triplet_no_j::create_Shells()
     // create each shells
     for(int n=njresolved+1; n<=nShells; n++) Shell[n].init(n, njresolved, m);
     
+    // add hydrogenic transitions for non-j-resolved --> j-resolved & non-j-resolved
+    for(int n=njresolved+1; n<=nShells; n++)
+        for(int l=0; l<n; l++) Level(n, l).Set_hydrogenic_transitions(*this);
+    
     return;
 }
 
@@ -2293,7 +2436,9 @@ void Gas_of_HeI_Atoms::init(int nS, int njres, int nQ, int nTS, int mflag)
     //===============================================================================
     Sing.init(nS, mflag);
     Trip.init((int)min(nS, njresolved), mflag);
+    Trip_glob=&Trip;
     if(nS>(int)njresolved) Trip_no_j.init(nS, njresolved, mflag);
+    Trip_glob=NULL;
     
     indexT=Sing.Get_total_number_of_Levels();
     nl=indexT_no_j=indexT+Trip.Get_total_number_of_Levels();
@@ -2528,20 +2673,7 @@ double Gas_of_HeI_Atoms:: Get_A(int n, int l, int s, int j, int np, int lp, int 
   return 0.0;
 }
 
-/*
-double Gas_of_HeI_Atoms:: Get_f(int n, int l, int s, int j, 
-                                int np, int lp, int sp, int jp) const
-{
-    if(s==0) return Sing.Level(n, l).Get_f(np, lp, sp, jp);
-    else if(s==1 && n<=njresolved) return Trip.Level(n, l, j).Get_f(np, lp, sp, jp);
-    else if(s==1 && n>njresolved) return Trip_no_j.Level(n, l).Get_f(np, lp, sp, jp);
-    
-    cout << " Gas_of_HeI_Atoms:: fail " << endl;
-    return 0.0;
-}
-*/
-
-double Gas_of_HeI_Atoms:: Get_nu21(int n, int l, int s, int j, 
+double Gas_of_HeI_Atoms:: Get_nu21(int n, int l, int s, int j,
                                    int np, int lp, int sp, int jp) const
 {
     if(s==0) return Sing.Level(n, l).Get_nu21(np, lp, sp, jp);

@@ -16,8 +16,6 @@ using namespace std;
 //===========================================================================================================
 // Helium constants
 //===========================================================================================================
-//const double const_RM=3289391007.44e+6;   // Rydberg constant for Helium in [Hz] (from Drake book)
-//const double const_mu_M=1.37074562e-4;    // ration mu/M for 4^He                (from Drake book)
 const double const_RM=3289391006.715e+6;    // Rydberg constant for Helium in [Hz] (from Drake book)
 const double const_mu_M=1.370745641e-4;     // ratio mu/M for 4^He                 (from Drake book)
 
@@ -88,7 +86,7 @@ double compute_DEc_QD(int n, int l, int s, int j)
     else{ cerr << " compute_DEc_QD:: oops " << endl; return 0.0; }
     
     double ns=n, nso, Dn=1.0e+300;
-    double eps=1.0e-15;
+    double eps=1.0e-14;
     
     while(fabs(Dn/ns)>eps)
     {
