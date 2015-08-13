@@ -20,7 +20,7 @@
 using namespace std;
 
 int mess_Topbase=0;
-int nuc_fac_TopBase=10.0;
+double nuc_fac_TopBase=1.0e+10;   // old calculations used == 2.0 and ==10.0
 
 //===========================================================================================================
 // convert the crossections into Ric
@@ -163,7 +163,7 @@ void load_all_Topbase_data(string path)
 
     // Triplet-states
     for(int i=0; i<18; i++)
-        load_Topbase_data(path+TopBase_Levels_S[i].fname, TopBase_Levels_S[i].Ec, TopBase_Level_data_T);
+        load_Topbase_data(path+TopBase_Levels_T[i].fname, TopBase_Levels_T[i].Ec, TopBase_Level_data_T);
 
     return;
 }
