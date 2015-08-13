@@ -1,8 +1,11 @@
 //========================================================================================
 // Author: Jens Chluba
 // Date: June 2007
-// last modification: July 2015
+// last modification: August 2015
 //========================================================================================
+// 13.08.2015: Added Ric setup. Smith rates work as before with gw/(2s+1)/(2l+1) factor.
+//             Hydrogenic rates are more accurate now, since not only 10Ec is used for
+//             integration. Topbase rates also up to Em instead of 2Ec.
 // 12.08.2015: Added all the transition rate setups. Data from Drake & Morton is used for
 //             levels with n<=10 (aside from the gaps in that data). Checked that the
 //             number of transitions is the same as well as some explicit transition
@@ -25,6 +28,8 @@
 #include "HeI_Atom.h"
 #include "He4_Quantum_Defects.h"
 #include "Oscillator_strength.h"
+#include "Smits_He_recomb_data.h"
+#include "HeI_Ric_Topbase.h"
 
 #include "routines.h"
 #include "physical_consts.h"
@@ -44,8 +49,7 @@ const double He1s2_ion=198310.6690*const_cl*const_h/const_e;
 //===================================================================================
 // location of the atomic model for helium
 //===================================================================================
-//const string path=COSMORECDIR+"./Development/Helium/Helium.Data.lite/";
-//const string path="./Helium.Data.lite/";
+//const string path=COSMORECDIR+"./Development/Helium/Helium.Data/";
 const string path="./Helium.Data/";
 
 //===================================================================================
@@ -610,7 +614,7 @@ void Electron_Level_HeI_Singlet::init(int n, int l, int mflag)
     }
     
     create_Transition_lookup_table();
-
+    
     if(mess_flag>0)
     {
         cout << "\n %##############################################################%" << endl;
@@ -2111,10 +2115,13 @@ void Atom_HeI_Triplet::create_Shells()
 int Atom_HeI_Triplet::Get_Level_index(int n, int l, int j) const 
 { 
     if(n<2 || n>nShells || l>=n || l<0 || l+1<j || l>j+1 || (l==0 && j!=1)) 
-        cout << " Atom_HeI_Triplet::Get_Level_index: no level with " 
-             << n << " " << l << " " << j << " !!! " << endl;
+    {
+        cerr << " Atom_HeI_Triplet::Get_Level_index: No level with (n, l, s, j)= ("
+             << n << ", " << l << ", " << 1 << ", " << j << ")!!! " << endl;
+        exit(0);
+    }
 
-  return Get_number_of_Levels_until(n-1)+3*(l+1)-2-(l+1-j)-1; 
+  return Get_number_of_Levels_until(n-1)+3*(l+1)-2-(l+1-j)-1;
 }
 
 //------------------------------------------------------------------------------------------------------
@@ -2298,8 +2305,11 @@ int Atom_HeI_Triplet_no_j::Get_number_of_Levels_until(int nmax) const
 int Atom_HeI_Triplet_no_j::Get_Level_index(int n, int l) const 
 { 
     if(n>nShells || n<=njresolved || l>=n || l<0)
-        cout << " Atom_HeI_Triplet_no_j::Get_Level_index: no level with " 
-             << n << " " << l << " !!! " << endl;
+    {
+        cerr << " Atom_HeI_Triplet_no_j::Get_Level_index: No level with (n, l, s, j)= ("
+             << n << ", " << l << ", " << 1 << ", " << -10 << ")!!! " << endl;
+        exit(0);
+    }
     
     return Get_number_of_Levels_until(n-1)+l; 
 }
@@ -2410,6 +2420,11 @@ Electron_Level_HeI_Triplet_no_j& Atom_HeI_Triplet_no_j::Level(int n, int l)
 void Gas_of_HeI_Atoms::init(int nS, int njres, int nQ, int nTS, int mflag)
 { 
     //===============================================================================
+    // do not read transition data but only energies!
+    //===============================================================================
+    if(nS<0){ HeI_Atom_read_transition_data=0; nS=-nS; }
+    
+    //===============================================================================
     // above njresolved the triplet states will not be treated j-resolved.
     // this should not be smaller than 10
     //===============================================================================
@@ -2427,11 +2442,6 @@ void Gas_of_HeI_Atoms::init(int nS, int njres, int nQ, int nTS, int mflag)
     
     _HeI_add_Intercomb=n_HeI_add_Intercomb;
     _HeI_add_Quad=n_HeI_add_Quad;
-    
-    //===============================================================================
-    // do not read transition data
-    //===============================================================================
-    if(nS<0){ HeI_Atom_read_transition_data=0; nS=-nS; }
     
     //===============================================================================
     Sing.init(nS, mflag);
@@ -2749,12 +2759,15 @@ void Gas_of_HeI_Atoms::Show_NLSJ(int i) const
 //=================================================================================================
 int Gas_of_HeI_Atoms::Get_Level_index(int n, int l, int s, int j) const
 {
-  if(s==0) return Sing.Get_Level_index(n, l);
-  else if(s==1 && n<=njresolved) return Trip.Get_Level_index(n, l, j)+indexT;
-  else if(s==1 && n>njresolved) return Trip_no_j.Get_Level_index(n, l)+indexT_no_j;
-
-  cout << " Get_as_of_HeI_Atoms::Get_Level_index: No level with s= " << s << endl; 
-  return 0; 
+    if(s==0 && j==l) return Sing.Get_Level_index(n, l);
+    else if(s==1 && n<=njresolved) return Trip.Get_Level_index(n, l, j)+indexT;
+    else if(s==1 && n>njresolved) return Trip_no_j.Get_Level_index(n, l)+indexT_no_j;
+    
+    cerr << " Get_as_of_HeI_Atoms::Get_Level_index: No level with (n, l, s, j)= ("
+         << n << ", " << l << ", " << s << ", " << j << ")!!! " << endl;
+    exit(0);
+    
+    return 0; 
 }
 
 //===================================================================================
@@ -2940,3 +2953,124 @@ double Gas_of_HeI_Atoms::Ni_Saha(int i, double Ne, double Nc, double TM)  const
   return 0.0;
 }
  
+//===================================================================================
+//
+// photoionization rate setup
+//
+//===================================================================================
+// This is the structure for the rates (T==TopBase, S==Smits, H==Hydrogenic)
+//
+// HeI-Singlet:
+//
+//    "T",
+//    "T", "T",
+//    "T", "T", "T",
+//    "T", "T", "T", "S",
+//    "T", "T", "T", "S", "S", // n=5
+//    "T", "T", "T", "H", "H", "H",
+//    "T", "T", "T", "H", "H", "H", "H",
+//    "T", "T", "T", "H", "H", "H", "H", "H",
+//    "T", "T", "T", "H", "H", "H", "H", "H", "H",
+//    "T", "H", "H", "H", "H", "H", "H", "H", "H", "H" // n=10
+//
+// HeI-Triplet:
+//
+//    "T", "T",
+//    "T", "T", "T",
+//    "T", "S", "T", "S",
+//    "T", "S", "T", "S", "S", // n=5
+//    "T", "H", "T", "H", "H", "H",
+//    "T", "H", "T", "H", "H", "H", "H",
+//    "T", "H", "T", "H", "H", "H", "H", "H",
+//    "T", "H", "T", "H", "H", "H", "H", "H", "H",
+//    "T", "H", "H", "H", "H", "H", "H", "H", "H", "H" // n=10
+//
+//===================================================================================
+void Gas_of_HeI_Atoms::clear_Interaction_w_photons()
+{
+    for(int n=1; n<=Get_nShells(); n++)
+        for(int l=0; l<n; l++) Interaction_with_Photons_SH_QSP[n-1][l].clear();
+    
+    Interaction_with_Photons_SH_QSP.clear();
+    
+    return;
+}
+
+//===================================================================================
+// initialize photoionization rates
+//===================================================================================
+void Gas_of_HeI_Atoms::init_photoionization_rates(int mflag)
+{
+    // setup memory
+    Interaction_with_Photons_SH_QSP.resize(Get_nShells());
+    for(int n=1; n<=Get_nShells(); n++) Interaction_with_Photons_SH_QSP[n-1].resize(n);
+ 
+    for(int n=1; n<=Get_nShells(); n++)
+        for(int l=0; l<n; l++)
+            Interaction_with_Photons_SH_QSP[n-1][l].init(n, l, 1.0, const_malpha_mp, mflag);
+    
+    if(mflag>0) cout << " Gas_of_HeI_Atoms::init_photoionization_rates: done with hydrogenic " << endl;
+    
+    // topbase data
+    load_all_Topbase_data(path+"TopBase_data/");
+    
+    if(mflag>0) cout << " Gas_of_HeI_Atoms::init_photoionization_rates: done with Topbase " << endl;
+
+    return;
+}
+
+//===================================================================================
+// use hydrogenic value Ric = (nucHe/nucH)^3 * RicH(T*nucH/nucHe)
+//===================================================================================
+double Gas_of_HeI_Atoms::R_ic(int i, double T_g)
+{
+    int n=Get_n(i), l=Get_l(i), s=Get_S(i);
+
+    if(n<=10)
+    {
+        //===========================================================================
+        // Topbase
+        //===========================================================================
+        if(l==0) return Ric_Topbase(n, l, s, T_g);
+        else if(l==1)
+        {
+            if(s==0 && n<=9) return Ric_Topbase(n, l, s, T_g);
+            if(s==1 && n<=3) return Ric_Topbase(n, l, s, T_g);
+        }
+        else if(l==2 && n<=9) return Ric_Topbase(n, l, s, T_g);
+        
+        //===========================================================================
+        // Smith recombination coefficients without stimulated recombination
+        //===========================================================================
+        if(s==0 && ((n==4 && l==3) ||
+                    (n==5 && l==3) || (n==5 && l==4)) )
+        { return Smits_Rec_Rate(n, l, s, T_g)/Ni_NeNc_LTE(i, T_g); }
+        
+        if(s==1 && ((n==4 && l==1) || (n==4 && l==3) ||
+                    (n==5 && l==1) || (n==5 && l==3) || (n==5 && l==4)) )
+        { return Smits_Rec_Rate(n, l, s, T_g)/Ni_NeNc_LTE(i, T_g); }
+    }
+    
+    //===============================================================================
+    // Hydrogenic coefficients
+    //===============================================================================
+    double nucHe=Get_nu_ion(i), nucH=Interaction_with_Photons_SH_QSP[n-1][l].Get_nu_ionization();
+    double chi=nucHe/nucH;
+    
+    return Interaction_with_Photons_SH_QSP[n-1][l].R_nl_c_Int(T_g/chi);
+}
+
+double Gas_of_HeI_Atoms::R_ic(int n, int l, int s, int j, double T_g)
+{ return R_ic(Get_Level_index(n, l, s, j), T_g); }
+
+//===================================================================================
+// use Saha relation
+//===================================================================================
+double Gas_of_HeI_Atoms::R_ci(int i, double T_g)
+{ return R_ic(i, T_g)*Ni_NeNc_LTE(i, T_g); }
+
+double Gas_of_HeI_Atoms::R_ci(int n, int l, int s, int j, double T_g)
+{ return R_ci(Get_Level_index(n, l, s, j), T_g); }
+
+//===================================================================================
+//===================================================================================

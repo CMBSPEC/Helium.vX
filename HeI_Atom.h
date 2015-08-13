@@ -1,8 +1,11 @@
 //========================================================================================
 // Author: Jens Chluba
 // Date: June 2007
-// last modification: July 2015
+// last modification: August 2015
 //========================================================================================
+// 13.08.2015: Added Ric setup. Smith rates work as before with gw/(2s+1)/(2l+1) factor.
+//             Hydrogenic rates are more accurate now, since not only 10Ec is used for
+//             integration. Topbase rates also up to Em instead of 2Ec.
 // 12.08.2015: Added all the transition rate setups. Data from Drake & Morton is used for
 //             levels with n<=10 (aside from the gaps in that data). Checked that the
 //             number of transitions is the same as well as some explicit transition
@@ -29,6 +32,7 @@
 #include "physical_consts.h"
 #include "File.h"
 #include "Voigtprofiles.h"
+#include "Rec_Phot_BB.h"
 #include "Photoionization_cross_section.h"
 
 using namespace std;
@@ -622,6 +626,11 @@ private:
     Voigtprofile_Dawson phi_HeI_nD_S[11]; 
     //===================================================================================
     
+    //===================================================================================
+    // for photoionization and recombination rates from/to different levels
+    //===================================================================================
+    vector<vector<Rec_Phot_BB_SH_QSP> > Interaction_with_Photons_SH_QSP;
+    
 public:
     //===================================================================================
     //Konstructors and Destructors
@@ -705,6 +714,18 @@ public:
     double Ni_NeNc_LTE(int i, double TM) const;
     double Xi_Saha(int i, double Xe, double Xc, double NH, double TM) const;
     double Ni_Saha(int i, double Ne, double Nc, double TM) const; 
+
+    //================================================================================
+    // access to photoionization rates
+    //================================================================================
+    void clear_Interaction_w_photons();
+    void init_photoionization_rates(int mflag=1);
+
+    double R_ic(int i, double T_g);                                     // in 1/sec
+    double R_ci(int i, double T_g);                                     // in cm^3/sec
+    double R_ic(int n, int l, int s, int j, double T_g);                // in 1/sec
+    double R_ci(int n, int l, int s, int j, double T_g);                // in cm^3/sec
+    //================================================================================
 };
 
 #endif
