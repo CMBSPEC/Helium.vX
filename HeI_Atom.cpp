@@ -55,7 +55,6 @@ const double He1s2_ion=198310.6690*const_cl*const_h/const_e;
 #define HEIDATA ((string)"")
 #endif
 
-//const string path=COSMORECDIR+"./Development/Helium/Helium.Data/";
 const string path=HEIDATA+"./Helium.Data/";
 
 //===================================================================================
@@ -1711,8 +1710,8 @@ void Atomic_Shell_HeI_Singlet::display_general_data_of_level(int i)
 {
     if(i>=(int)(nn) || Angular_Momentum_Level.size()==0)
     {
-    cout << " This level does not exist inside shell " << nn << endl;
-    return;
+        cout << " This level does not exist inside shell " << nn << endl;
+        return;
     }
 
     cout << " %==============================================================%" << endl;
@@ -1924,23 +1923,22 @@ void Atom_HeI_Singlet::create_Shells()
     for(int n=1; n<=nShells; n++) Shell[n].init(n, m);
     
     // add hydrogenic transitions for DM singlet gap
-    Level(9, 8).Set_hydrogenic_transitions(*this);
-    Level(10, 7).Set_hydrogenic_transitions(*this);
-    Level(10, 8).Set_hydrogenic_transitions(*this);
-    Level(10, 9).Set_hydrogenic_transitions(*this);
-
+    if(nShells>=9)
+    {
+        Level(9, 8).Set_hydrogenic_transitions(*this);
+    
+        if(nShells>=10)
+        {
+            Level(10, 7).Set_hydrogenic_transitions(*this);
+            Level(10, 8).Set_hydrogenic_transitions(*this);
+            Level(10, 9).Set_hydrogenic_transitions(*this);
+        }
+    }
+    
     // add all hydrogenic transitions for levels with n>10
     for(int n=11; n<=nShells; n++)
         for(int l=0; l<n; l++) Level(n, l).Set_hydrogenic_transitions(*this);
     
-    //cout << " testing singlet " << endl;
-    //Level(5, 4).Set_hydrogenic_transitions(*this);
-    //Level(8, 1).Set_hydrogenic_transitions(*this);
-    //Level(8, 4).Set_hydrogenic_transitions(*this);
-    //Level(9, 4).Set_hydrogenic_transitions(*this);
-    //Level(10, 4).Set_hydrogenic_transitions(*this);
-    // for low l-states hydrogenic transitions can be off by a lot!
-  
     return;
 }
 
@@ -2095,14 +2093,24 @@ void Atom_HeI_Triplet::create_Shells()
     for(int n=2; n<=nShells; n++) Shell[n].init(n, m); 
     
     // add hydrogenic transitions for DM triplet gap
-    for(int j=7-1; j<=7+1; j++) Level(8, 7, j).Set_hydrogenic_transitions(*this);
-    for(int j=8-1; j<=8+1; j++) Level(9, 8, j).Set_hydrogenic_transitions(*this);
-    for(int j=7-1; j<=7+1; j++) Level(10, 7, j).Set_hydrogenic_transitions(*this);
-    for(int j=8-1; j<=8+1; j++) Level(10, 8, j).Set_hydrogenic_transitions(*this);
-    for(int j=9-1; j<=9+1; j++) Level(10, 9, j).Set_hydrogenic_transitions(*this);
-    // selected transitions
-    for(int j=6-1; j<=6+1; j++) Level(9, 6, j).Set_hydrogenic_transitions(8, 7, *this);
-    for(int j=6-1; j<=6+1; j++) Level(10, 6, j).Set_hydrogenic_transitions(8, 7, *this);
+    if(nShells>=8)
+    {
+        for(int j=7-1; j<=7+1; j++) Level(8, 7, j).Set_hydrogenic_transitions(*this);
+
+        if(nShells>=9)
+        {
+            for(int j=8-1; j<=8+1; j++) Level(9, 8, j).Set_hydrogenic_transitions(*this);
+            for(int j=6-1; j<=6+1; j++) Level(9, 6, j).Set_hydrogenic_transitions(8, 7, *this);
+
+            if(nShells>=10)
+            {
+                for(int j=7-1; j<=7+1; j++) Level(10, 7, j).Set_hydrogenic_transitions(*this);
+                for(int j=8-1; j<=8+1; j++) Level(10, 8, j).Set_hydrogenic_transitions(*this);
+                for(int j=9-1; j<=9+1; j++) Level(10, 9, j).Set_hydrogenic_transitions(*this);
+                for(int j=6-1; j<=6+1; j++) Level(10, 6, j).Set_hydrogenic_transitions(8, 7, *this);
+            }
+        }
+    }
     
     // add all hydrogenic transitions for levels with n>10
     for(int n=11; n<=nShells; n++)
@@ -2110,11 +2118,6 @@ void Atom_HeI_Triplet::create_Shells()
             for(int j=l-1; j<=l+1; j++)
                 Level(n, l, j).Set_hydrogenic_transitions(*this);
 
-    //cout << " testing triplet " << endl;
-    //Level(8, 4, 3).Set_hydrogenic_transitions(*this);
-    //Level(8, 4, 4).Set_hydrogenic_transitions(*this);
-    //Level(8, 4, 5).Set_hydrogenic_transitions(*this);
-    
     return;
 }
 

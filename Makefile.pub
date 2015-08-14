@@ -1,0 +1,22 @@
+#============================================================================================
+# rules
+#============================================================================================
+all:
+	make tidy; make wipeDS; \
+    rm -rf ./Helium.vX; rm -rf ./Helium.vX.tar.gz; \
+    mkdir ./Helium.vX; \
+    cp -r ./Helium.Data ./Helium.vX/.; \
+    cp ./Makefile ./Helium.vX/.; \
+    cp ./Makefile.in.pub ./Helium.vX/Makefile.in; \
+    cp ./main.cpp ./Helium.vX/.; \
+    cp ./HeI_Atom.cpp ./Helium.vX/.; \
+    cp ./HeI_Atom.h ./Helium.vX/.; \
+    cp ./He4_Quantum_Defects.cpp ./Helium.vX/.; \
+    cp ./He4_Quantum_Defects.h ./Helium.vX/.; \
+    cp ./HeI_Ric_Topbase.cpp ./Helium.vX/.; \
+    cp ./HeI_Ric_Topbase.h ./Helium.vX/.; \
+    cp ./Smits_He_recomb_data.h ./Helium.vX/.; \
+    cp ./README ./Helium.vX/.;
+
+tarball: all
+	tar -czf Helium.vX.tar.gz ./Helium.vX;
