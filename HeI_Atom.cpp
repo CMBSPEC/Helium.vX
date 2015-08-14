@@ -49,8 +49,14 @@ const double He1s2_ion=198310.6690*const_cl*const_h/const_e;
 //===================================================================================
 // location of the atomic model for helium
 //===================================================================================
+#ifdef HEIDATADIR
+#define HEIDATA ((string)HEIDATADIR)
+#else
+#define HEIDATA ((string)"")
+#endif
+
 //const string path=COSMORECDIR+"./Development/Helium/Helium.Data/";
-const string path="./Helium.Data/";
+const string path=HEIDATA+"./Helium.Data/";
 
 //===================================================================================
 // Rydberg for hydrogenic levels in neutral helium
@@ -3004,7 +3010,7 @@ void Gas_of_HeI_Atoms::init_photoionization_rates(int mflag)
     // setup memory
     Interaction_with_Photons_SH_QSP.resize(Get_nShells());
     for(int n=1; n<=Get_nShells(); n++) Interaction_with_Photons_SH_QSP[n-1].resize(n);
- 
+    
     for(int n=1; n<=Get_nShells(); n++)
         for(int l=0; l<n; l++)
             Interaction_with_Photons_SH_QSP[n-1][l].init(n, l, 1.0, const_malpha_mp, mflag);
@@ -3015,17 +3021,18 @@ void Gas_of_HeI_Atoms::init_photoionization_rates(int mflag)
     load_all_Topbase_data(path+"TopBase_data/");
     
     if(mflag>0) cout << " Gas_of_HeI_Atoms::init_photoionization_rates: done with Topbase " << endl;
-
+    
     return;
 }
 
 //===================================================================================
-// use hydrogenic value Ric = (nucHe/nucH)^3 * RicH(T*nucH/nucHe)
+// use hydrogenic value Ric = (nuHe/nuH)^3 * RicH(T*nucH/nucHe)
 //===================================================================================
 double Gas_of_HeI_Atoms::R_ic(int i, double T_g)
 {
     int n=Get_n(i), l=Get_l(i), s=Get_S(i);
-
+    bool include_stim=1;
+    
     if(n<=10)
     {
         //===========================================================================
@@ -3044,11 +3051,27 @@ double Gas_of_HeI_Atoms::R_ic(int i, double T_g)
         //===========================================================================
         if(s==0 && ((n==4 && l==3) ||
                     (n==5 && l==3) || (n==5 && l==4)) )
-        { return Smits_Rec_Rate(n, l, s, T_g)/Ni_NeNc_LTE(i, T_g); }
+        {
+            double Ric=Smits_Rec_Rate(n, l, s, T_g)/Ni_NeNc_LTE(i, T_g);
+            if(include_stim) Ric*=1.0+1.0/(exp( min(700.0, const_h_kb*Get_nu_ion(i)/T_g))-1.0);
+            
+            return Ric;
+        }
         
         if(s==1 && ((n==4 && l==1) || (n==4 && l==3) ||
                     (n==5 && l==1) || (n==5 && l==3) || (n==5 && l==4)) )
-        { return Smits_Rec_Rate(n, l, s, T_g)/Ni_NeNc_LTE(i, T_g); }
+        {
+            double Ric=Smits_Rec_Rate(n, l, s, T_g)/Ni_NeNc_LTE(i, T_g);
+            if(include_stim) Ric*=1.0+1.0/(exp( min(700.0, const_h_kb*Get_nu_ion(i)/T_g))-1.0);
+            Ric*=Get_gw(i)/3.0/(2.0*l+1.0);  // factor from j average
+            
+            // setting like for Rubino-Martion et al paper
+            //double Ric=Smits_Rec_Rate(n, l, s, T_g)/Trip.Level(n, l, l+1).Ni_NeNc_LTE(T_g);
+            //if(include_stim) Ric*=1.0+1.0/(exp( min(700.0, const_h_kb*Trip.Level(n, l, l+1).Get_nu_ion()/T_g))-1.0);
+            //Ric*=(2.0*(l+1.0)+1.0)/3.0/(2.0*l+1.0);
+            
+            return Ric;
+        }
     }
     
     //===============================================================================
@@ -3057,7 +3080,7 @@ double Gas_of_HeI_Atoms::R_ic(int i, double T_g)
     double nucHe=Get_nu_ion(i), nucH=Interaction_with_Photons_SH_QSP[n-1][l].Get_nu_ionization();
     double chi=nucHe/nucH;
     
-    return Interaction_with_Photons_SH_QSP[n-1][l].R_nl_c_Int(T_g/chi);
+    return pow(chi, 3)*Interaction_with_Photons_SH_QSP[n-1][l].R_nl_c_Int(T_g/chi);
 }
 
 double Gas_of_HeI_Atoms::R_ic(int n, int l, int s, int j, double T_g)
