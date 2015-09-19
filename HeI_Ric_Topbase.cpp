@@ -184,17 +184,18 @@ struct TopBase_integration_data
 double N_nu_pl_Topbase(double nu, double Tg)
 { return 2.0*pow(nu/const_cl, 2)/( exp( min(700.0, const_h_kb*nu/Tg) )-1.0); }
 
+//===========================================================================================================
 double dRic_lin(double lgnu, void *p)
 {
     TopBase_integration_data *d=((TopBase_integration_data *) p);
     
     double nu=exp(lgnu), y=0, dy=0;
     polint_JC(&(d->TDp->lgnu_Hz[0]), &(d->TDp->lgsig_ic[0]), d->np, lgnu, npol, &y, &dy);
-
+    
     return nu*exp(y)*N_nu_pl_Topbase(nu, d->Tg);
 }
 
-double integrate_Ric(TopBase_Level_data &TD, double Ec, double Tg)
+double integrate_Ric_Patt(TopBase_Level_data &TD, double Ec, double Tg)
 {
     TopBase_integration_data d;
     d.Tg=Tg;
@@ -209,7 +210,59 @@ double integrate_Ric(TopBase_Level_data &TD, double Ec, double Tg)
     
     r=Integrate_using_Patterson_adaptive(ab, bb, epsrel, epsabs, dRic_lin, p);
     
-    return FOURPI*r;    
+    return FOURPI*r;
+}
+
+//===========================================================================================================
+double dRic_lin_Grid(int i, void *p)
+{
+    TopBase_integration_data *d=((TopBase_integration_data *) p);
+    
+    double nu=exp(d->TDp->lgnu_Hz[i]);
+    double sig_nu=exp(d->TDp->lgsig_ic[i]);
+    
+    return nu*sig_nu*N_nu_pl_Topbase(nu, d->Tg);
+}
+
+double integrate_Ric_Grid(TopBase_Level_data &TD, double Ec, double Tg)
+{
+    TopBase_integration_data d;
+    d.Tg=Tg;
+    d.TDp=&TD;
+    d.np=TD.lgnu_Hz.size();
+    void *p=&d;
+    
+    double nuc=Ec*const_Ry_inf_icm*const_cl, num=min(nuc*nuc_fac_TopBase, exp(TD.lgnu_Hz.back()));
+    int n_int=50000;
+    double ab=log(nuc), bb=log(num), db=(bb-ab)/n_int;
+    
+    // simple trapezoidal rule
+    double r=0.5*(dRic_lin(ab, p)+dRic_lin(bb, p));
+    for(int k=1; k<n_int; k++) r+=dRic_lin(ab+k*db, p);
+    
+    return FOURPI*db*r;
+}
+
+//===========================================================================================================
+double integrate_Ric(TopBase_Level_data &TD, double Ec, double Tg)
+{
+    return integrate_Ric_Patt(TD, Ec, Tg);
+    //1 0.7280330516
+    //2 7.782295147
+
+    //return integrate_Ric_Grid(TD, Ec, Tg);
+    // 5000
+    //1 0.7280449241
+    //2 7.782455593
+    // 10000
+    //1 0.7280361026
+    //2 7.782364343
+    // 15000
+    //1 0.7280344693
+    //2 7.782347446
+    // 50000
+    //1 0.7280332804
+    //2 7.782335146
 }
 
 //===========================================================================================================
