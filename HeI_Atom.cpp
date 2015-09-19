@@ -3,6 +3,7 @@
 // Date: June 2007
 // last modification: August 2015
 //========================================================================================
+// 18.08.2015: Added photo-ionization cross section routines
 // 13.08.2015: Added Ric setup. Smith rates work as before with gw/(2s+1)/(2l+1) factor.
 //             Hydrogenic rates are more accurate now, since not only 10Ec is used for
 //             integration. Topbase rates also up to Em instead of 2Ec.
@@ -66,6 +67,8 @@ const double const_EHeI=const_EH_inf/(1.0+const_me_malp);
 // for default data is loaded
 //===================================================================================
 static int HeI_Atom_read_transition_data=1;
+const bool switch_Bauman=0;
+const bool switch_Hydrogenic=0;
 
 //===================================================================================
 // files for transition rates and energies from Drake & Morton
@@ -405,6 +408,36 @@ void compute_Hydrogenic_transition_inf_S(int n, int l,
 }
 
 //===================================================================================
+// approximate transtion line ratios using Wigner 6J symbols
+//===================================================================================
+double Line_Ratio(int l, int j, int lp, int jp)
+{
+    int Dl=lp-l;
+    int Dj=jp-j;
+    double r;
+    
+    if(Dl==-1)
+    {
+        r=(2.0+l+j)*(1.0+l+j)*(-1.0+l+j)*(-2.0+l+j)/(4.0*j*(2.0*j+1.0)*l*(2.0*l-1.0));
+        if(Dj>=0) r*=(2.0*j+1.0)*(-1.0-l+j)*(-2.0+l-j)/((1.0+j)*(1.0+l+j)*(-2.0+l+j));
+        if(Dj==1) r*=(-3.0+l-j)*(j-l)*j/((2.0*j+1.0)*(-1.0+l+j)*(2.0+l+j));
+    }
+    else if(Dl==1)
+    {
+        r=(4.0+l+j)*(3.0+l+j)*(1.0+l+j)*(l+j)/(4.0*(j+1.0)*(2.0*j+1.0)*(l+1.0)*(2.0*l+3.0));
+        if(Dj<=0) r*=(2.0*j+1.0)*(-1.0+l-j)*(-2.0-l+j)/(j*(1.0+l+j)*(4.0+l+j));
+        if(Dj==-1) r*=(-3.0-l+j)*(l-j)*(1.0+j)/((2.0*j+1.0)*(l+j)*(3.0+l+j));
+    }
+    else{ cerr << " Line_Ratio::This should not happen..." << endl; exit(0); }
+    
+//    cout << l << " " << j << " || " << lp << " " << jp << endl;
+//    cout << Dl << " " << Dj << " " << r << " " << (2.0*jp+1.0)/(2.0*lp+1.0)/3.0 << endl;
+//    wait_f_r();
+    
+    return r;
+}
+
+//===================================================================================
 void compute_Hydrogenic_transition_inf_T(int n, int l, int j, int np, int lp,
                                          Atom_HeI_Triplet &Trip,
                                          vector<Transition_Data_HeI_A> &v)
@@ -428,7 +461,7 @@ void compute_Hydrogenic_transition_inf_T(int n, int l, int j, int np, int lp,
     {
         if(lp==0) jp=0+1;
         
-        if(lp>=0 && lp<np)
+        if(lp>=0 && lp<np && (j-jp==-1 || j-jp==0 || j-jp==1)) // additional check of Dj!
         {
             dd.jp=jp;
             dd.gwp=2.0*dd.jp+1.0;
@@ -438,7 +471,9 @@ void compute_Hydrogenic_transition_inf_T(int n, int l, int j, int np, int lp,
             
             double A21H=A_SH(1, const_malpha_mp, n, l, dd.np, dd.lp);
             double DnuH=DnuH_func_Helium(n, np);
-            dd.A21=A21H*pow(dd.Dnu/DnuH, 3)*(2.0*jp+1.0)/(2.0*lp+1.0)/3.0;
+            // compute triplet transion with Wigner-expression
+            if(switch_Hydrogenic) dd.A21=A21H*pow(dd.Dnu/DnuH, 3)*Line_Ratio(l, j, lp, jp);
+            else dd.A21=A21H*pow(dd.Dnu/DnuH, 3)*(2.0*jp+1.0)/(2.0*lp+1.0)/3.0;
             v.push_back(dd);
         }
     }
@@ -468,7 +503,7 @@ void compute_Hydrogenic_transition_inf_T(int n, int l, int j,
             {
                 if(lp==0) jp=0+1;
                 
-                if(lp>=0 && lp<np)
+                if(lp>=0 && lp<np && (j-jp==-1 || j-jp==0 || j-jp==1)) // additional check of Dj!
                 {
                     dd.np=np;
                     dd.lp=lp;
@@ -480,7 +515,8 @@ void compute_Hydrogenic_transition_inf_T(int n, int l, int j,
                     
                     double A21H=A_SH(1, const_malpha_mp, n, l, dd.np, dd.lp);
                     double DnuH=DnuH_func_Helium(n, np);
-                    dd.A21=A21H*pow(dd.Dnu/DnuH, 3)*(2.0*jp+1.0)/(2.0*lp+1.0)/3.0;
+                    if(switch_Hydrogenic) dd.A21=A21H*pow(dd.Dnu/DnuH, 3)*Line_Ratio(l, j, lp, jp);
+                    else dd.A21=A21H*pow(dd.Dnu/DnuH, 3)*(2.0*jp+1.0)/(2.0*lp+1.0)/3.0;
                     v.push_back(dd);
                     
                     //check_Hydrogenic_transition(n, l, 1, j, np, lp, 1, jp, dd.A21, v);
@@ -2997,8 +3033,9 @@ double Gas_of_HeI_Atoms::Ni_Saha(int i, double Ne, double Nc, double TM)  const
 //===================================================================================
 void Gas_of_HeI_Atoms::clear_Interaction_w_photons()
 {
-    for(int n=1; n<=Get_nShells(); n++)
-        for(int l=0; l<n; l++) Interaction_with_Photons_SH_QSP[n-1][l].clear();
+    for(int k=0; k<(int)Interaction_with_Photons_SH_QSP.size(); k++)
+        for(int l=0; l<(int)Interaction_with_Photons_SH_QSP[k].size(); l++)
+            Interaction_with_Photons_SH_QSP[k][l].clear();
     
     Interaction_with_Photons_SH_QSP.clear();
     
@@ -3010,13 +3047,21 @@ void Gas_of_HeI_Atoms::clear_Interaction_w_photons()
 //===================================================================================
 void Gas_of_HeI_Atoms::init_photoionization_rates(int mflag)
 {
+    if(mflag>0) cout << " Gas_of_HeI_Atoms::setting up photoionization rates " << endl;
+
+    vector<double> dum(8, 0.0);
+    Ric_norm=Tg_norm_ref=dum;
+
     // setup memory
+    clear_Interaction_w_photons();
     Interaction_with_Photons_SH_QSP.resize(Get_nShells());
-    for(int n=1; n<=Get_nShells(); n++) Interaction_with_Photons_SH_QSP[n-1].resize(n);
-    
     for(int n=1; n<=Get_nShells(); n++)
+    {
+        Interaction_with_Photons_SH_QSP[n-1].resize(n);
+        
         for(int l=0; l<n; l++)
             Interaction_with_Photons_SH_QSP[n-1][l].init(n, l, 1.0, const_malpha_mp, mflag);
+    }
     
     if(mflag>0) cout << " Gas_of_HeI_Atoms::init_photoionization_rates: done with hydrogenic " << endl;
     
@@ -3035,19 +3080,20 @@ double Gas_of_HeI_Atoms::R_ic(int i, double T_g)
 {
     int n=Get_n(i), l=Get_l(i), s=Get_S(i);
     bool include_stim=1;
+    double facBauman=(Get_J(i)!=-10 && switch_Bauman ? (2.0*Get_J(i)+1.0)/(2.0*l+1.0)/(2.0*s+1.0) : 1.0);
     
     if(n<=10)
     {
         //===========================================================================
         // Topbase
         //===========================================================================
-        if(l==0) return Ric_Topbase(n, l, s, T_g);
+        if(l==0) return facBauman*Ric_Topbase(n, l, s, T_g);
         else if(l==1)
         {
-            if(s==0 && n<=9) return Ric_Topbase(n, l, s, T_g);
-            if(s==1 && n<=3) return Ric_Topbase(n, l, s, T_g);
+            if(s==0 && n<=9) return facBauman*Ric_Topbase(n, l, s, T_g);
+            if(s==1 && n<=3) return facBauman*Ric_Topbase(n, l, s, T_g);
         }
-        else if(l==2 && n<=9) return Ric_Topbase(n, l, s, T_g);
+        else if(l==2 && n<=9) return facBauman*Ric_Topbase(n, l, s, T_g);
         
         //===========================================================================
         // Smith recombination coefficients without stimulated recombination
@@ -3058,7 +3104,7 @@ double Gas_of_HeI_Atoms::R_ic(int i, double T_g)
             double Ric=Smits_Rec_Rate(n, l, s, T_g)/Ni_NeNc_LTE(i, T_g);
             if(include_stim) Ric*=1.0+1.0/(exp( min(700.0, const_h_kb*Get_nu_ion(i)/T_g))-1.0);
             
-            return Ric;
+            return facBauman*Ric;
         }
         
         if(s==1 && ((n==4 && l==1) || (n==4 && l==3) ||
@@ -3073,7 +3119,7 @@ double Gas_of_HeI_Atoms::R_ic(int i, double T_g)
             //if(include_stim) Ric*=1.0+1.0/(exp( min(700.0, const_h_kb*Trip.Level(n, l, l+1).Get_nu_ion()/T_g))-1.0);
             //Ric*=(2.0*(l+1.0)+1.0)/3.0/(2.0*l+1.0);
             
-            return Ric;
+            return facBauman*Ric;
         }
     }
     
@@ -3082,8 +3128,8 @@ double Gas_of_HeI_Atoms::R_ic(int i, double T_g)
     //===============================================================================
     double nucHe=Get_nu_ion(i), nucH=Interaction_with_Photons_SH_QSP[n-1][l].Get_nu_ionization();
     double chi=nucHe/nucH;
-    
-    return pow(chi, 3)*Interaction_with_Photons_SH_QSP[n-1][l].R_nl_c_Int(T_g/chi);
+
+    return facBauman*pow(chi, 3)*Interaction_with_Photons_SH_QSP[n-1][l].R_nl_c_Int(T_g/chi);
 }
 
 double Gas_of_HeI_Atoms::R_ic(int n, int l, int s, int j, double T_g)
@@ -3097,6 +3143,102 @@ double Gas_of_HeI_Atoms::R_ci(int i, double T_g)
 
 double Gas_of_HeI_Atoms::R_ci(int n, int l, int s, int j, double T_g)
 { return R_ci(Get_Level_index(n, l, s, j), T_g); }
+
+//===================================================================================
+// cross sections
+//===================================================================================
+double Gas_of_HeI_Atoms::sig_ic_Hyd(int i, double nu)
+{
+    int n=Get_n(i), l=Get_l(i);
+    double facBauman=(Get_J(i)!=-10 && switch_Bauman ? (2.0*Get_J(i)+1.0)/(2.0*l+1.0)/(2.0*Get_S(i)+1.0) : 1.0);
+    
+    double nucHe=Get_nu_ion(i), nucH=Interaction_with_Photons_SH_QSP[n-1][l].Get_nu_ionization();
+    double chi=nucHe/nucH;
+    return facBauman*Interaction_with_Photons_SH_QSP[n-1][l].sig_phot_ion_lim(nu/chi);
+}
+
+double Gas_of_HeI_Atoms::sig_ic(int i, double nu, double Tg)
+{
+    //return sig_ic_Hyd(i, nu);
+    
+    int n=Get_n(i), l=Get_l(i), s=Get_S(i);
+    double facBauman=(Get_J(i)!=-10 && switch_Bauman ? (2.0*Get_J(i)+1.0)/(2.0*l+1.0)/(2.0*s+1.0) : 1.0);
+    
+    if(n<=10)
+    {
+        //===========================================================================
+        // Topbase
+        //===========================================================================
+        if(l==0) return facBauman*sig_ic_Topbase(n, l, s, nu);
+        else if(l==1)
+        {
+            if(s==0 && n<=9) return facBauman*sig_ic_Topbase(n, l, s, nu);
+            if(s==1 && n<=3) return facBauman*sig_ic_Topbase(n, l, s, nu);
+        }
+        else if(l==2 && n<=9) return facBauman*sig_ic_Topbase(n, l, s, nu);
+        
+        //===========================================================================
+        // for Smith use hydrogenic shape but renormalized
+        //===========================================================================
+        if(s==0 && ((n==4 && l==3) ||
+                    (n==5 && l==3) || (n==5 && l==4)) )
+        {
+            double nucHe=Get_nu_ion(i), nucH=Interaction_with_Photons_SH_QSP[n-1][l].Get_nu_ionization();
+            if(nu<nucHe) return 0.0;
+            double chi=nucHe/nucH;
+            
+            int index_norm;
+            if(n==4 && l==3) index_norm=0;
+            if(n==5 && l==3) index_norm=1;
+            if(n==5 && l==4) index_norm=2;
+            
+            if(Tg!=Tg_norm_ref[index_norm])
+            {
+                double RicS=R_ic(i, Tg);
+                double RicH=pow(chi, 3)*Interaction_with_Photons_SH_QSP[n-1][l].R_nl_c_Int(Tg/chi);
+
+                Ric_norm[index_norm]=RicS/RicH;
+                Tg_norm_ref[index_norm]=Tg;
+            }
+
+            return facBauman*Ric_norm[index_norm]*Interaction_with_Photons_SH_QSP[n-1][l].sig_phot_ion_lim(nu/chi);
+        }
+        
+        if(s==1 && ((n==4 && l==1) || (n==4 && l==3) ||
+                    (n==5 && l==1) || (n==5 && l==3) || (n==5 && l==4)) )
+        {
+            double nucHe=Get_nu_ion(i), nucH=Interaction_with_Photons_SH_QSP[n-1][l].Get_nu_ionization();
+            if(nu<nucHe) return 0.0;
+            double chi=nucHe/nucH;
+            
+            int index_norm;
+            if(n==4 && l==1) index_norm=3;
+            if(n==4 && l==3) index_norm=4;
+            if(n==5 && l==1) index_norm=5;
+            if(n==5 && l==3) index_norm=6;
+            if(n==5 && l==4) index_norm=7;
+            
+            if(Tg!=Tg_norm_ref[index_norm])
+            {
+                double RicS=R_ic(i, Tg);
+                double RicH=pow(chi, 3)*Interaction_with_Photons_SH_QSP[n-1][l].R_nl_c_Int(Tg/chi);
+                
+                Ric_norm[index_norm]=RicS/RicH;
+                Tg_norm_ref[index_norm]=Tg;
+            }
+            
+            return facBauman*Ric_norm[index_norm]*Interaction_with_Photons_SH_QSP[n-1][l].sig_phot_ion_lim(nu/chi);
+        }
+    }
+    
+    //===============================================================================
+    // Hydrogenic value
+    //===============================================================================
+    double nucHe=Get_nu_ion(i), nucH=Interaction_with_Photons_SH_QSP[n-1][l].Get_nu_ionization();
+    double chi=nucHe/nucH;
+    
+    return facBauman*Interaction_with_Photons_SH_QSP[n-1][l].sig_phot_ion_lim(nu/chi);
+}
 
 //===================================================================================
 //===================================================================================

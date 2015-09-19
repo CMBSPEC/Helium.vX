@@ -630,6 +630,8 @@ private:
     // for photoionization and recombination rates from/to different levels
     //===================================================================================
     vector<vector<Rec_Phot_BB_SH_QSP> > Interaction_with_Photons_SH_QSP;
+    vector<double> Ric_norm;
+    vector<double> Tg_norm_ref;
     
 public:
     //===================================================================================
@@ -725,6 +727,13 @@ public:
     double R_ci(int i, double T_g);                                     // in cm^3/sec
     double R_ic(int n, int l, int s, int j, double T_g);                // in 1/sec
     double R_ci(int n, int l, int s, int j, double T_g);                // in cm^3/sec
+    
+    // hydrogenic cross-section with shifted treshold energy
+    double sig_ic_Hyd(int i, double nu);
+    // Topbase, smith and hydrogenic cross sections corresponding to model for Ric. For
+    // Smith, the cross section is renormalized to have the correct total rate after
+    // integration.
+    double sig_ic(int i, double nu, double Tg);
     //================================================================================
 };
 

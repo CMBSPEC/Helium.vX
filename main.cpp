@@ -21,6 +21,8 @@
 
 using namespace std;
 
+double const_HI_A2s_1s = 8.2206;
+
 //===========================================================================================================
 int main(int narg, char *args[])
 {
@@ -40,6 +42,22 @@ int main(int narg, char *args[])
     Gas_of_HeI_Atoms HeIA(nShells, njres, nQ, nTS, -2);
     HeIA.init_photoionization_rates(0);
     wait_f_r(" HeI setup finished ");
+ 
+    int npion=50000;
+    vector<double> xion(npion);
+    init_xarr(1.0, 1.0e+4, &xion[0], npion, 1, 0);
+    
+    ofstream ofs("./sig_He_9D.dat");
+    int HeI_index=HeIA.Get_Level_index(9, 2, 0, 2);
+    ofs.precision(8);
+    for(int k=0; k<npion; k++)
+    {
+        ofs << xion[k] << " " << HeIA.sig_ic(HeI_index, xion[k]*HeIA.Get_nu_ion(HeI_index), 0.0)
+                       << " " << HeIA.sig_ic_Hyd(HeI_index, xion[k]*HeIA.Get_nu_ion(HeI_index)) << endl;
+    }
+    ofs.close();
+    wait_f_r();
+    exit(0);
     
     for(int n=2; n<=nShells; n++)
         for(int l=0; l<=min(6, n-1); l++)
@@ -106,6 +124,51 @@ int main(int narg, char *args[])
     cout << " Ric == " << HeIA.R_ic(4, 3, 0, 3, 2.725*6001) << endl;
     cout << " Ric == " << HeIA.R_ic(15, 6, 0, 6, 2.725*6001) << endl;
     cout << " Ric == " << HeIA.R_ic(15, 6, 1, 5, 2.725*6001) << endl;
+    
+#pragma omp parallel for default(shared) schedule(dynamic)
+    for(int m=1; m<HeIA.Get_total_number_of_Levels(); m++)
+    {
+        double d=HeIA.R_ic(m, 4000.0);
+        
+        cout << m << " " << d << endl;
+    }
+    
+    /*
+     int nup=9, lup=4;
+     int nlow=4, llow=3;
+     
+     cout << HeIA.Sing.Level(nup, lup).Get_Trans_Data(nlow, llow, 0, llow).A21 << endl;
+     
+     double DnuH=const_EH_inf_Hz/(1.0+const_me_malp)*(1.0/nlow/nlow-1.0/nup/nup);
+     double DnuHe=HeIA.Get_nu21(nup, lup, 0, lup, nlow, llow, 0, llow);
+     
+     cout << A_SH(1, const_malpha_mp, nup, lup, nlow, llow) << " "
+     << A_SH(1, const_malpha_mp, nup, lup, nlow, llow)*pow(DnuHe/DnuH, 3) << " "
+     << DnuHe/DnuH << endl;
+     */
+    
+    int nup=9, lup=1, jup=2;
+    int nlow=8, llow=2, jlow=4;
+    
+    cout << HeIA.Trip.Level(nup, lup, jup).Get_Trans_Data(nlow, llow, 1, jup-1).A21 << " "
+         << HeIA.Trip.Level(nup, lup, jup).Get_Trans_Data(nlow, llow, 1, jup).A21 << " "
+         << HeIA.Trip.Level(nup, lup, jup).Get_Trans_Data(nlow, llow, 1, jup+1).A21 << endl;
+    
+    /*
+     double DnuH=const_EH_inf_Hz/(1.0+const_me_malp)*(1.0/nlow/nlow-1.0/nup/nup);
+     double DnuHe=HeIAtom.Get_nu21(nup, lup, 1, jup, nlow, llow, 1, jlow);
+     
+     cout << A_SH(1, const_malpha_mp, nup, lup, nlow, llow)/3.0 << " "
+     << A_SH(1, const_malpha_mp, nup, lup, nlow, llow)*pow(DnuHe/DnuH, 3)/3.0 << " "
+     << A_SH(1, const_malpha_mp, nup, lup, nlow, llow)/pow(DnuHe/DnuH, 3)/3.0 << " "
+     << DnuHe/DnuH << endl;
+     
+     cout << A_SH(1, const_malpha_mp, nup, lup, nlow, llow) << " "
+     << A_SH(1, const_malpha_mp, nup, lup, nlow, llow)*pow(DnuHe/DnuH, 3) << " "
+     << A_SH(1, const_malpha_mp, nup, lup, nlow, llow)/pow(DnuHe/DnuH, 3) << " "
+     << DnuHe/DnuH << endl;
+     */    wait_f_r();
+    exit(0);
     
     return 0;
 }

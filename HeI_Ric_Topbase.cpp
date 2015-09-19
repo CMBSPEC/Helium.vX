@@ -21,6 +21,7 @@ using namespace std;
 
 int mess_Topbase=0;
 double nuc_fac_TopBase=1.0e+10;   // old calculations used == 2.0 and ==10.0
+int npol=2;
 
 //===========================================================================================================
 // convert the crossections into Ric
@@ -104,8 +105,8 @@ TopBase_Level TopBase_Levels_T[18]=
 
 struct TopBase_Level_data
 {
-    vector<double> nu_Hz;
-    vector<double> sig_ic;
+    vector<double> lgnu_Hz;
+    vector<double> lgsig_ic;
 };
 
 vector<TopBase_Level_data> TopBase_Level_data_S;
@@ -142,8 +143,8 @@ void load_Topbase_data(string fname, double Ec, vector<TopBase_Level_data> &TD)
         d1= strtod(str.c_str(), &pEnd);
         d2= strtod(pEnd,NULL);
         
-        dum.nu_Hz.push_back(d1*const_Ry_inf_icm*const_cl); // conversion E/Ryd --> Hz
-        dum.sig_ic.push_back(d2*1.0e-18);                  // conversion Mbarn --> cm^2
+        dum.lgnu_Hz.push_back(log(d1*const_Ry_inf_icm*const_cl));  // conversion E/Ryd --> Hz
+        dum.lgsig_ic.push_back(log(d2*1.0e-18));                   // conversion Mbarn --> cm^2
     }
     
     TD.push_back(dum);
@@ -188,9 +189,9 @@ double dRic_lin(double lgnu, void *p)
     TopBase_integration_data *d=((TopBase_integration_data *) p);
     
     double nu=exp(lgnu), y=0, dy=0;
-    polint_JC(&(d->TDp->nu_Hz[0]), &(d->TDp->sig_ic[0]), d->np, nu, 2, &y, &dy);
+    polint_JC(&(d->TDp->lgnu_Hz[0]), &(d->TDp->lgsig_ic[0]), d->np, lgnu, npol, &y, &dy);
 
-    return nu*y*N_nu_pl_Topbase(nu, d->Tg);
+    return nu*exp(y)*N_nu_pl_Topbase(nu, d->Tg);
 }
 
 double integrate_Ric(TopBase_Level_data &TD, double Ec, double Tg)
@@ -198,12 +199,12 @@ double integrate_Ric(TopBase_Level_data &TD, double Ec, double Tg)
     TopBase_integration_data d;
     d.Tg=Tg;
     d.TDp=&TD;
-    d.np=TD.nu_Hz.size();
+    d.np=TD.lgnu_Hz.size();
     void *p=&d;
     
     double r=0.0;
     double epsrel=1.0e-5, epsabs=1.0e-20;
-    double nuc=Ec*const_Ry_inf_icm*const_cl, num=min(nuc*nuc_fac_TopBase, TD.nu_Hz.back());
+    double nuc=Ec*const_Ry_inf_icm*const_cl, num=min(nuc*nuc_fac_TopBase, exp(TD.lgnu_Hz.back()));
     double ab=log(nuc), bb=log(num);
     
     r=Integrate_using_Patterson_adaptive(ab, bb, epsrel, epsabs, dRic_lin, p);
@@ -232,6 +233,50 @@ double Ric_Topbase(int n, int l, int s, double Tg)
             if(TopBase_Levels_T[i].n==n && TopBase_Levels_T[i].l==l) break;
         
         return integrate_Ric(TopBase_Level_data_T[i], TopBase_Levels_T[i].Ec, Tg);
+    }
+    else{ cerr << " no Topbase data found for (n, l, s) == ("
+               << n << ", " << l << ", " << s << ")! Exiting... " << endl; exit(0); }
+    
+    return 0.0;
+}
+
+//===========================================================================================================
+//
+// photoionization cross section
+//
+//===========================================================================================================
+double sig_ic_Topbase(int n, int l, int s, double nu)
+{
+    int i;
+    double y=0, dy=0;
+    
+    if(s==0)
+    {
+        for(i=0; i<(int)TopBase_Level_data_S.size(); i++)
+            if(TopBase_Levels_S[i].n==n && TopBase_Levels_S[i].l==l) break;
+        
+        if(TopBase_Levels_S[i].Ec*const_Ry_inf_icm*const_cl>nu) return 0;
+        
+        polint_JC(&(TopBase_Level_data_S[i].lgnu_Hz[0]),
+                  &(TopBase_Level_data_S[i].lgsig_ic[0]),
+                  TopBase_Level_data_S[i].lgnu_Hz.size(),
+                  log(nu), npol, &y, &dy);
+        
+        return exp(y);
+    }
+    else if(s==1)
+    {
+        for(i=0; i<(int)TopBase_Level_data_T.size(); i++)
+            if(TopBase_Levels_T[i].n==n && TopBase_Levels_T[i].l==l) break;
+        
+        if(TopBase_Levels_T[i].Ec*const_Ry_inf_icm*const_cl>nu) return 0;
+
+        polint_JC(&(TopBase_Level_data_T[i].lgnu_Hz[0]),
+                  &(TopBase_Level_data_T[i].lgsig_ic[0]),
+                  TopBase_Level_data_T[i].lgnu_Hz.size(),
+                  log(nu), npol, &y, &dy);
+        
+        return exp(y);
     }
     else{ cerr << " no Topbase data found for (n, l, s) == ("
                << n << ", " << l << ", " << s << ")! Exiting... " << endl; exit(0); }
