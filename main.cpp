@@ -10,6 +10,7 @@
 // several libs
 //===========================================================================================================
 #include "HeI_Atom.h"
+#include "Oscillator_strength.h"
 #include "He4_Quantum_Defects.h"
 
 #include "physical_consts.h"
@@ -22,6 +23,9 @@
 using namespace std;
 
 double const_HI_A2s_1s = 8.2206;
+
+double DnuH_func_freq(int nup, int nlow)
+{ return const_EH_inf_Hz/(1.0+const_me_malp)*(1.0/nlow/nlow-1.0/nup/nup); }
 
 //===========================================================================================================
 int main(int narg, char *args[])
@@ -42,13 +46,94 @@ int main(int narg, char *args[])
     Gas_of_HeI_Atoms HeIA(nShells, njres, nQ, nTS, -2);
     HeIA.init_photoionization_rates(0);
     wait_f_r(" HeI setup finished ");
+
+/*
+    //====================================================================================
+    // plot Eic
+    //====================================================================================
+    ofstream ofsA("./E_He_nG_T.dat");
+    ofsA.precision(8);
+
+    for(int n=5; n<=20; n++)
+    {
+        //double DnuHe=HeIA.Get_nu_ion(HeIA.Get_Level_index(n, 1, 0, 0));
+        double DnuHe_1=HeIA.Get_nu_ion(HeIA.Get_Level_index(n, 4, 1, 3));
+        double DnuHe_2=HeIA.Get_nu_ion(HeIA.Get_Level_index(n, 4, 1, 4));
+        double DnuHe_3=HeIA.Get_nu_ion(HeIA.Get_Level_index(n, 4, 1, 5));
+        double DnuH=DnuH_func_freq(1000000.0, n);
+
+        //ofsA << n << " " << DnuHe/DnuH << endl;
+        ofsA << n << " " << DnuHe_1/DnuH << " " << DnuHe_2/DnuH << " " << DnuHe_3/DnuH << endl;
+    }
  
+    ofsA.close();
+    exit(0);
+    //====================================================================================
+*/
+
+    //====================================================================================
+    // plot Aij
+    //====================================================================================
+    ofstream ofsA;
+    
+    int li=1, si=0, ji=1;
+    int lj=0, sj=0, jj=0;
+
+    for(int nj=1; nj<=7; nj++)
+    {
+        string nameA="./A_coefficients/A_He_nP_"+int_to_string(nj)+"S_S_II.dat";
+        ofsA.open(nameA.c_str());
+        ofsA.precision(8);
+        
+        for(int n=nj+1; n<=10; n++)
+        {
+            double A=HeIA.Get_A(n, li, si, ji, nj, lj, sj, jj);
+            
+            double DnuH=DnuH_func_freq(n, nj);
+            double DnuHe=HeIA.Get_nu21(n, li, si, ji, nj, lj, sj, jj);
+            double AHy=A_SH(1, const_malpha_mp, n, li, nj, lj);
+            
+            ofsA << n << " "
+            << A/1.0e+8 << " "
+            << AHy*pow(DnuHe/DnuH, 2)/1.0e+8 << " "
+            << AHy*pow(DnuHe/DnuH, 3)/1.0e+8 << " "
+            << A/(AHy*pow(DnuHe/DnuH, 2)) << " "
+            << A/(AHy*pow(DnuHe/DnuH, 3)) << " "
+            << A/(AHy*pow(DnuHe/DnuH, 0)) << endl;
+        }
+        
+        ofsA.close();
+    }
+    
+    exit(0);
+    //====================================================================================
+/*
+    //====================================================================================
+    // plot threshold frequencies
+    //====================================================================================
+    ofstream ofsC("./sig_He_nuc_nD_S.dat");
+    ofsC.precision(8);
+    
+    int LC=2, SC=0;
+    for(int n=1+max(SC, LC); n<=10; n++)
+    {
+        int HeI_index=HeIA.Get_Level_index(n, LC, SC, max(SC, LC));
+        ofsC << n << " "
+             << HeIA.sig_ic(HeI_index, HeIA.Get_nu_ion(HeI_index)*1.01, 0.0)/1.0e-16 << " "
+             << HeIA.sig_ic_Hyd(HeI_index, HeIA.Get_nu_ion(HeI_index)*1.01)/1.0e-16 << " "
+             << endl;
+    }
+    
+    ofsC.close();
+    exit(0);
+    //====================================================================================
+*/
     int npion=50000;
     vector<double> xion(npion);
     init_xarr(1.0, 1.0e+4, &xion[0], npion, 1, 0);
     
-    ofstream ofs("./sig_He_9D.dat");
-    int HeI_index=HeIA.Get_Level_index(9, 2, 0, 2);
+    ofstream ofs("./sig_He_5D_T.dat");
+    int HeI_index=HeIA.Get_Level_index(5, 2, 1, 2);
     ofs.precision(8);
     for(int k=0; k<npion; k++)
     {
@@ -146,14 +231,15 @@ int main(int narg, char *args[])
      << A_SH(1, const_malpha_mp, nup, lup, nlow, llow)*pow(DnuHe/DnuH, 3) << " "
      << DnuHe/DnuH << endl;
      */
-    
+
+    /*
     int nup=9, lup=1, jup=2;
     int nlow=8, llow=2, jlow=4;
     
     cout << HeIA.Trip.Level(nup, lup, jup).Get_Trans_Data(nlow, llow, 1, jup-1).A21 << " "
          << HeIA.Trip.Level(nup, lup, jup).Get_Trans_Data(nlow, llow, 1, jup).A21 << " "
          << HeIA.Trip.Level(nup, lup, jup).Get_Trans_Data(nlow, llow, 1, jup+1).A21 << endl;
-    
+     */
     /*
      double DnuH=const_EH_inf_Hz/(1.0+const_me_malp)*(1.0/nlow/nlow-1.0/nup/nup);
      double DnuHe=HeIAtom.Get_nu21(nup, lup, 1, jup, nlow, llow, 1, jlow);

@@ -82,7 +82,7 @@ const struct DrakeQDCoeff DrakeQD_SLL[35]=
   {6,	0,	6,	8,	 0.0}
 };
 
-const struct DrakeQDCoeff DrakeQD_TLLm1[35]=
+const struct DrakeQDCoeff DrakeQD_TLLm1[30]=
 {
 /*{L,	S,	J,  order,	QD} */
   {1,	1,	0,	0,	 0.06832800251},
@@ -123,7 +123,7 @@ const struct DrakeQDCoeff DrakeQD_TLLm1[35]=
 };
 
 
-const struct DrakeQDCoeff DrakeQD_TLL[35]=
+const struct DrakeQDCoeff DrakeQD_TLL[30]=
 {
 /*{L,	S,	J,  order,	QD} */
   {1,	1,	1,	0,	 0.06835785765},

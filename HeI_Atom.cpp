@@ -3,6 +3,8 @@
 // Date: June 2007
 // last modification: August 2015
 //========================================================================================
+// 05.10.2015: Added option to change between A_ij ~ nu^2 and nu^3 (old scaling). Also
+//             added possiblity to change the nP-nS and nS-nP series.
 // 18.08.2015: Added photo-ionization cross section routines
 // 13.08.2015: Added Ric setup. Smith rates work as before with gw/(2s+1)/(2l+1) factor.
 //             Hydrogenic rates are more accurate now, since not only 10Ec is used for
@@ -69,6 +71,9 @@ const double const_EHeI=const_EH_inf/(1.0+const_me_malp);
 static int HeI_Atom_read_transition_data=1;
 const bool switch_Bauman=0;
 const bool switch_Hydrogenic=0;
+const int scale_A=2;
+const double rescale_nP_nS=1.0; // 0.5; // change Singlet nP --> nS series for n>1
+const double rescale_nS_nP=1.0; // 2.2; // change Singlet nS --> nP series
 
 //===================================================================================
 // files for transition rates and energies from Drake & Morton
@@ -396,7 +401,10 @@ void compute_Hydrogenic_transition_inf_S(int n, int l,
                 
                 double A21H=A_SH(1, const_malpha_mp, n, l, dd.np, dd.lp);
                 double DnuH=DnuH_func_Helium(n, np);
-                dd.A21=A21H*pow(dd.Dnu/DnuH, 3);
+                if(n>1 && l==0 && dd.np>1 && dd.lp==1) A21H*=rescale_nS_nP;
+                if(n>1 && l==1 && dd.np>1 && dd.lp==0) A21H*=rescale_nP_nS;
+                dd.A21=A21H*pow(dd.Dnu/DnuH, scale_A);
+                
                 v.push_back(dd);
                 
                 //check_Hydrogenic_transition(n, l, 0, l, np, lp, 0, lp, dd.A21, v);
@@ -472,8 +480,8 @@ void compute_Hydrogenic_transition_inf_T(int n, int l, int j, int np, int lp,
             double A21H=A_SH(1, const_malpha_mp, n, l, dd.np, dd.lp);
             double DnuH=DnuH_func_Helium(n, np);
             // compute triplet transion with Wigner-expression
-            if(switch_Hydrogenic) dd.A21=A21H*pow(dd.Dnu/DnuH, 3)*Line_Ratio(l, j, lp, jp);
-            else dd.A21=A21H*pow(dd.Dnu/DnuH, 3)*(2.0*jp+1.0)/(2.0*lp+1.0)/3.0;
+            if(switch_Hydrogenic) dd.A21=A21H*pow(dd.Dnu/DnuH, scale_A)*Line_Ratio(l, j, lp, jp);
+            else dd.A21=A21H*pow(dd.Dnu/DnuH, scale_A)*(2.0*jp+1.0)/(2.0*lp+1.0)/3.0;
             v.push_back(dd);
         }
     }
@@ -515,8 +523,8 @@ void compute_Hydrogenic_transition_inf_T(int n, int l, int j,
                     
                     double A21H=A_SH(1, const_malpha_mp, n, l, dd.np, dd.lp);
                     double DnuH=DnuH_func_Helium(n, np);
-                    if(switch_Hydrogenic) dd.A21=A21H*pow(dd.Dnu/DnuH, 3)*Line_Ratio(l, j, lp, jp);
-                    else dd.A21=A21H*pow(dd.Dnu/DnuH, 3)*(2.0*jp+1.0)/(2.0*lp+1.0)/3.0;
+                    if(switch_Hydrogenic) dd.A21=A21H*pow(dd.Dnu/DnuH, scale_A)*Line_Ratio(l, j, lp, jp);
+                    else dd.A21=A21H*pow(dd.Dnu/DnuH, scale_A)*(2.0*jp+1.0)/(2.0*lp+1.0)/3.0;
                     v.push_back(dd);
                     
                     //check_Hydrogenic_transition(n, l, 1, j, np, lp, 1, jp, dd.A21, v);
@@ -564,7 +572,7 @@ void compute_Hydrogenic_transition_inf_T_no_j(int n, int l,
                         
                         double A21H=A_SH(1, const_malpha_mp, n, l, dd.np, dd.lp);
                         double DnuH=DnuH_func_Helium(n, np);
-                        dd.A21=A21H*pow(dd.Dnu/DnuH, 3)*(2.0*jp+1.0)/(2.0*lp+1.0)/3.0;
+                        dd.A21=A21H*pow(dd.Dnu/DnuH, scale_A)*(2.0*jp+1.0)/(2.0*lp+1.0)/3.0;
                         v.push_back(dd);
                         
                         //check_Hydrogenic_transition(n, l, 1, -10, np, lp, 1, jp, dd.A21, v);
@@ -587,7 +595,7 @@ void compute_Hydrogenic_transition_inf_T_no_j(int n, int l,
                 
                 double A21H=A_SH(1, const_malpha_mp, n, l, dd.np, dd.lp);
                 double DnuH=DnuH_func_Helium(n, np);
-                dd.A21=A21H*pow(dd.Dnu/DnuH, 3);
+                dd.A21=A21H*pow(dd.Dnu/DnuH, scale_A);
                 v.push_back(dd);
                 
                 //check_Hydrogenic_transition(n, l, 1, -10, np, lp, 1, -10, dd.A21, v);
