@@ -1,8 +1,11 @@
 //========================================================================================
-// Author: Jens Chluba
-// Date: June 2007
-// last modification: August 2015
+// Authors: Jens Chluba and Luke Hart
+// Initial version: June 2007
 //========================================================================================
+// 01.03.2017: added scaling with alpha and me using hydrogenic approximation [LH & JC]
+// 05.10.2015: Added option to change between A_ij ~ nu^2 and nu^3 (old scaling). Also
+//             added possiblity to change the nP-nS and nS-nP series.
+// 18.08.2015: Added photo-ionization cross section routines
 // 13.08.2015: Added Ric setup. Smith rates work as before with gw/(2s+1)/(2l+1) factor.
 //             Hydrogenic rates are more accurate now, since not only 10Ec is used for
 //             integration. Topbase rates also up to Em instead of 2Ec.
@@ -71,12 +74,14 @@ private:
     double nuion;                                              // ionisation frequency in Hz
     double Eion;                                               // ionisation energy in eV
     double Eion_ergs;                                          // ionisation energy in ergs
+    double FSC_scale;                                          // Helium alpha scaling variable
+    double ME_scale;                                           // scaling of the electron mass
 
     //==========================================================
     // storage of additional data for computations 
     //==========================================================
     double Xi;          // Xi=Ni/NH == fraction of atoms in that state
-    double Ric;         // photoionization rate
+    double Ric;         // photoionization rate [JC: not explicitly rescaled for var consts]
 
     //==========================================================
     // to store all the dipole transitions and their parameters
@@ -146,6 +151,17 @@ public:
     double Ni_NeNc_LTE(double TM)  const;
     double Xi_Saha(double Xe, double Xc, double NH, double TM)  const;
     double Ni_Saha(double Ne, double Nc, double TM)  const; 
+    
+    //==============================================
+    // Now we consider rescaling functions for HeI
+    // Here we set rescale() and reset()
+    //==============================================
+    void rescale_level(double alpha_scale, double me_scale);
+    void reset_level() { this->rescale_level(1.,1.); }
+    
+    // Access functions for the fine structure constant scaling and the electron mass scaling
+    double get_FSC_scale() const { return this->FSC_scale; }
+    double get_ME_scale() const { return this->ME_scale; }
 };
 
 //========================================================================================
@@ -167,12 +183,14 @@ private:
     double nuion;                                              // ionisation frequency in Hz
     double Eion;                                               // ionisation energy in eV
     double Eion_ergs;                                          // ionisation energy in ergs
+    double FSC_scale;                                          // Helium alpha scaling variable
+    double ME_scale;                                           // scaling of the electron mass
 
     //==========================================================
     // storage of additional data for computations 
     //==========================================================
     double Xi;          // Xi=Ni/NH == fraction of atoms in that state
-    double Ric;         // photoionization rate
+    double Ric;         // photoionization rate [JC: not explicitly rescaled for var consts]
 
     //==========================================================
     // to store all the dipole transitions and their parameters
@@ -243,6 +261,17 @@ public:
     double Ni_NeNc_LTE(double TM) const;
     double Xi_Saha(double Xe, double Xc, double NH, double TM) const;
     double Ni_Saha(double Ne, double Nc, double TM) const; 
+    
+    //==============================================
+    // Now we consider rescaling functions for HeI
+    // Here we set rescale() and reset()
+    //==============================================
+    void rescale_level(double alpha_scale, double me_scale);
+    void reset_level() { this->rescale_level(1.,1.); }
+
+    // Access functions for the fine structure constant scaling and the electron mass scaling
+    double get_FSC_scale() const { return this->FSC_scale; }
+    double get_ME_scale() const { return this->ME_scale; }
 };
 
 //========================================================================================
@@ -265,12 +294,14 @@ private:
     double nuion;                                              // ionisation frequency in Hz
     double Eion;                                               // ionisation energy in eV
     double Eion_ergs;                                          // ionisation energy in ergs
+    double FSC_scale;                                          // Helium alpha scaling variable
+    double ME_scale;                                           // scaling of the electron mass
 
     //==========================================================
     // storage of additional data for computations 
     //==========================================================
     double Xi;          // Xi=Ni/NH == fraction of atoms in that state
-    double Ric;         // photoionization rate
+    double Ric;         // photoionization rate [JC: not explicitly rescaled for var consts]
 
     //==========================================================
     // to store all the dipole transitions and their parameters
@@ -340,6 +371,17 @@ public:
     double Ni_NeNc_LTE(double TM) const;
     double Xi_Saha(double Xe, double Xc, double NH, double TM) const;
     double Ni_Saha(double Ne, double Nc, double TM) const; 
+    
+    //==============================================
+    // Now we consider rescaling functions for HeI
+    // Here we set rescale() and reset()
+    //==============================================
+    void rescale_level(double alpha_scale, double me_scale);
+    void reset_level() { this->rescale_level(1.,1.); }
+
+    // Access functions for the fine structure constant scaling and the electron mass scaling
+    double get_FSC_scale() const { return this->FSC_scale; }
+    double get_ME_scale() const { return this->ME_scale; }
 };
 
 //========================================================================================
@@ -370,6 +412,10 @@ public:
     void display_all_level();
     void display_level(int i);
     void display_general_data_of_level(int i);
+    
+    // rescaling functions for this shell
+    void rescale_shell(double alpha_scale, double me_scale);
+    void reset_shell() { this->rescale_shell(1.,1.); }
 };
 
 //========================================================================================
@@ -400,6 +446,10 @@ public:
     void display_all_level();
     void display_level(int i);
     void display_general_data_of_level(int i);
+    
+    // rescaling functions for this shell
+    void rescale_shell(double alpha_scale, double me_scale);
+    void reset_shell() { this->rescale_shell(1.,1.); }
 };
 
 //========================================================================================
@@ -432,6 +482,10 @@ public:
     void display_all_level();
     void display_level(int i);
     void display_general_data_of_level(int i);
+    
+    // rescaling functions for this shell
+    void rescale_shell(double alpha_scale, double me_scale);
+    void reset_shell() { this->rescale_shell(1.,1.); }
 };
 
 //========================================================================================
@@ -489,6 +543,10 @@ public:
 
     int Get_total_number_of_Levels() const { return Level_Map.size(); }
     int Get_number_of_Levels_until(int nmax) const { return nmax*(nmax+1)/2; }
+    
+    // Rescaling functions for the atom singlet
+    void rescale_atom(double alpha_scale, double me_scale);
+    void reset_atom() { this->rescale_atom(1.,1.); }
 };
 
 //========================================================================================
@@ -545,6 +603,10 @@ public:
     int Get_l_of_Level(int i) const { return Level_Map[i].l; }
     int Get_s_of_Level(int i) const { return 1; }
     int Get_j_of_Level(int i) const { return Level_Map[i].j; }        // n>=2
+    
+    // Rescaling functions for the atom triplet
+    void rescale_atom(double alpha_scale, double me_scale);
+    void reset_atom() { this->rescale_atom(1.,1.); }
 };
 
 //========================================================================================
@@ -601,6 +663,10 @@ public:
     int Get_l_of_Level(int i) const { return Level_Map[i].l; }
     int Get_s_of_Level(int i) const { return 1; }
     int Get_njres() const { return njresolved; }
+    
+    // Rescaling functions for the atom singlet
+    void rescale_atom(double alpha_scale, double me_scale);
+    void reset_atom() { this->rescale_atom(1.,1.); }
 };
 
 //========================================================================================
@@ -632,6 +698,18 @@ private:
     vector<vector<Rec_Phot_BB_SH_QSP> > Interaction_with_Photons_SH_QSP;
     vector<double> Ric_norm;
     vector<double> Tg_norm_ref;
+
+    //===================================================================================
+    // Voigt profile initialisation [JC]
+    //===================================================================================
+    void voigt_init(int nS, int mflag=0);
+
+    // to compute rescaled photo_ionization and recombination rates [JC]
+    double FSC_scale;
+    double ME_scale;
+    double energy_scale;
+    double sig_scale;
+    double rate_scale_B;
     
 public:
     //===================================================================================
@@ -671,9 +749,11 @@ public:
     int Get_indexT() const { return indexT; }
     int Get_indexT_no_j() const { return indexT_no_j; }
     int Get_njres() const { return njresolved; }
-    int Get_Level_index(int n, int l, int s, int j) const; 
+    int Get_Level_index(int n, int l, int s, int j) const;
+    
     // approximate reduced mass of helium in units of me
     double Get_mu_red() const { return 1.0/(1.0+const_me_malp); }
+    double Get_gc() const { return 4.0; }   // spin weight of continuum particle
 
     bool are_add_Q_lines_loaded() const { return add_Q_lines_loaded; }
     bool are_add_TS_lines_loaded() const { return add_TS_lines_loaded; }
@@ -697,7 +777,8 @@ public:
     int Get_J(int i) const;
     double Get_gw(int i) const;
     double Get_nu_ion(int i) const;
-    
+    double Get_nu_ul(int i, int j) const { return Get_nu_ion(j)-Get_nu_ion(i); }
+
     int Get_n_down() const;
     int Get_n_down(int i) const;
     const Transition_Data_HeI_A& Get_Trans_Data(int i, int m) const;
@@ -735,6 +816,14 @@ public:
     // integration.
     double sig_ic(int i, double nu, double Tg);
     //================================================================================
+    
+    // Rescaling functions for the atom singlet
+    void rescale_gas(double alpha_scale, double me_scale);
+    void reset_gas() { this->rescale_gas(1.,1.); }
+
+    // Access functions for the fine structure constant scaling and the electron mass scaling
+    double get_FSC_scale() const { return this->FSC_scale; }
+    double get_ME_scale() const { return this->ME_scale; }
 };
 
 #endif

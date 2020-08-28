@@ -1,8 +1,8 @@
 //========================================================================================
-// Author: Jens Chluba
-// Date: June 2007
-// last modification: August 2015
+// Authors: Jens Chluba and Luke Hart
+// Initial version: June 2007
 //========================================================================================
+// 01.03.2017: added scaling with alpha and me using hydrogenic approximation [LH & JC]
 // 05.10.2015: Added option to change between A_ij ~ nu^2 and nu^3 (old scaling). Also
 //             added possiblity to change the nP-nS and nS-nP series.
 // 18.08.2015: Added photo-ionization cross section routines
@@ -625,6 +625,8 @@ void Electron_Level_HeI_Singlet::init(int n, int l, int mflag)
     mess_flag=mflag;
     gw=g_l();
     A_values.clear();
+    FSC_scale=1.;
+    ME_scale=1.;
     
     //===============================================================================
     // energies
@@ -958,7 +960,9 @@ double Electron_Level_HeI_Singlet::Ni_NeNc_LTE(double TM) const
 {
     // HeI --> gc=2 --> ge*gc=4
     // 30.07.2015: added reduced mass factor
-    return gw/4.0*pow(const_lambdac, 3)*pow(2.0*PI*const_kb_mec2*Get_mu_red()*TM, -1.5)
+    // factors for variation of fundamental constants: energy rescaled internally; just red. mass needed!
+    return gw/4.0*pow(const_lambdac, 3)
+                 *pow(2.0*PI*const_kb_mec2*Get_mu_red()*get_ME_scale()*TM, -1.5)
                  *exp(Eion_ergs/const_kB/TM );
 }
 
@@ -984,6 +988,8 @@ void Electron_Level_HeI_Triplet::init(int n, int l, int j, int mflag)
     mess_flag=mflag;
     gw=g_l();
     A_values.clear();
+    FSC_scale=1.;
+    ME_scale=1.;
     
     //===============================================================================
     // energies
@@ -1326,7 +1332,9 @@ double Electron_Level_HeI_Triplet::Ni_NeNc_LTE(double TM) const
 { 
     // HeI --> gc=2 --> ge*gc=4
     // 30.07.2015: added reduced mass factor
-    return gw/4.0*pow(const_lambdac, 3)*pow(2.0*PI*const_kb_mec2*Get_mu_red()*TM, -1.5)
+    // factors for variation of fundamental constants: energy rescaled internally; just red. mass needed!
+    return gw/4.0*pow(const_lambdac, 3)
+                 *pow(2.0*PI*const_kb_mec2*Get_mu_red()*get_ME_scale()*TM, -1.5)
                  *exp(Eion_ergs/const_kB/TM );
 }
 
@@ -1353,6 +1361,8 @@ void Electron_Level_HeI_Triplet_no_j::init(int n, int l, int njres, int mflag)
     mess_flag=mflag;
     gw=g_l();
     A_values.clear();
+    FSC_scale=1.;
+    ME_scale=1.;
     
     //===============================================================================
     // above njresolved the triplet states will not be treated j-resolved.
@@ -1695,7 +1705,9 @@ double Electron_Level_HeI_Triplet_no_j::Ni_NeNc_LTE(double TM) const
 { 
     // HeI --> gc=2 --> ge*gc=4
     // 30.07.2015: added reduced mass factor
-    return gw/4.0*pow(const_lambdac, 3)*pow(2.0*PI*const_kb_mec2*Get_mu_red()*TM, -1.5)
+    // factors for variation of fundamental constants: energy rescaled internally; just red. mass needed!
+    return gw/4.0*pow(const_lambdac, 3)
+                 *pow(2.0*PI*const_kb_mec2*Get_mu_red()*get_ME_scale()*TM, -1.5)
                  *exp(Eion_ergs/const_kB/TM );
 }
 
@@ -2514,73 +2526,10 @@ void Gas_of_HeI_Atoms::init(int nS, int njres, int nQ, int nTS, int mflag)
         //============================================================
         check_transition_data();        
         
-        //===========================================================
+        //============================================================
         // create the Voigt profiles
-        //===========================================================
-        double A21, f=0.0, nu21, lam21, Gamma;
-       
-        //===========================================================
-        // Transition-Data for n^1 P_1 - 1^1 S_0
-        //===========================================================
-        for(int n=2; n<=(int)min(nS, 10); n++)
-        {
-            A21=Sing.Level(n, 1).Get_A21(1, 0, 0, 0);
-            nu21=Sing.Level(n, 1).Get_nu21(1, 0, 0, 0);
-            lam21=Sing.Level(n, 1).Get_lambda21(1, 0, 0, 0);
-            
-            Gamma=0.0;
-            for(int m=0; m<(int)Sing.Level(n, 1).Get_n_down(); m++) 
-                Gamma+=Sing.Level(n, 1).Get_Trans_Data(m).A21;
-            
-            if(mflag>=1) cout << " Initializing profile for " << n 
-                              << "^1 P_1 - 1^1 S_0 transition:" 
-                              << nu21 << " " << lam21 << " " << A21 << " " 
-                              << Gamma << " " << f << endl;
-
-            phi_HeI_nP_S[n].Set_atomic_data_Gamma(nu21, lam21, A21, f, Gamma, 4);
-        }
-        
-        //===========================================================
-        // Transition-Data for n^3 P_1 - 1^1 S_0
-        //===========================================================
-        for(int n=2; n<=(int)min(nS, n_HeI_add_Intercomb); n++)
-        {
-            A21=Trip.Level(n, 1, 1).Get_A21(1, 0, 0, 0);
-            nu21=Trip.Level(n, 1, 1).Get_nu21(1, 0, 0, 0);
-            lam21=Trip.Level(n, 1, 1).Get_lambda21(1, 0, 0, 0);
-            
-            Gamma=0.0;
-            for(int m=0; m<(int)Trip.Level(n, 1, 1).Get_n_down(); m++) 
-                Gamma+=Trip.Level(n, 1, 1).Get_Trans_Data(m).A21;
-            
-            if(mflag>=1) cout << " Initializing profile for " << n 
-                              << "^3 P_1 - 1^1 S_0 transition:" 
-                              << nu21 << " " << lam21 << " " << A21 << " " 
-                              << Gamma << " " << f << endl;
-
-            phi_HeI_nP_T[n].Set_atomic_data_Gamma(nu21, lam21, A21, f, Gamma, 4);
-        }
-
-        //===========================================================
-        // Transition-Data for n^1 D_1 - 1^1 S_0
-        //===========================================================
-        for(int n=3; n<=(int)min(nS, n_HeI_add_Quad); n++)
-        {
-            A21=Sing.Level(n, 2).Get_A21(1, 0, 0, 0);
-            nu21=Sing.Level(n, 2).Get_nu21(1, 0, 0, 0);
-            lam21=Sing.Level(n, 2).Get_lambda21(1, 0, 0, 0);
-            
-            Gamma=0.0;
-            for(int m=0; m<(int)Sing.Level(n, 2).Get_n_down(); m++) 
-                Gamma+=Sing.Level(n, 2).Get_Trans_Data(m).A21;
-            
-            if(mflag>=1) cout << " Initializing profile for " << n 
-                              << "^1 D_1 - 1^1 S_0 transition:" 
-                              << nu21 << " " << lam21 << " " << A21 << " " 
-                              << Gamma << " " << f << endl;
-            
-            phi_HeI_nD_S[n].Set_atomic_data_Gamma(nu21, lam21, A21, f, Gamma, 4);
-        }
+        //============================================================
+        voigt_init(nS, mflag);
     }
     
     //========================================
@@ -2595,6 +2544,86 @@ void Gas_of_HeI_Atoms::init(int nS, int njres, int nQ, int nTS, int mflag)
     
     _HeI_add_Intercomb=_HeI_add_Quad=0;
     
+    // for rescaled photo_ionization and recombination rates [JC]
+    FSC_scale = 1.;
+    ME_scale = 1.;
+    energy_scale = 1.;
+    sig_scale = 1.;
+    rate_scale_B = 1.;
+
+    return;
+}
+
+//===================================================================================
+// Voigt profile initialisation [JC]
+//===================================================================================
+void Gas_of_HeI_Atoms::voigt_init(int nS, int mflag)
+{
+    double A21, f=0.0, nu21, lam21, Gamma;
+    
+    //===========================================================
+    // Transition-Data for n^1 P_1 - 1^1 S_0
+    //===========================================================
+    for(int n=2; n<=(int)min(nS, 10); n++)
+    {
+        A21=Sing.Level(n, 1).Get_A21(1, 0, 0, 0);
+        nu21=Sing.Level(n, 1).Get_nu21(1, 0, 0, 0);
+        lam21=Sing.Level(n, 1).Get_lambda21(1, 0, 0, 0);
+        
+        Gamma=0.0;
+        for(int m=0; m<(int)Sing.Level(n, 1).Get_n_down(); m++)
+        Gamma+=Sing.Level(n, 1).Get_Trans_Data(m).A21;
+        
+        if(mflag>=1) cout << " Initializing profile for " << n
+                          << "^1 P_1 - 1^1 S_0 transition:"
+                          << nu21 << " " << lam21 << " " << A21 << " "
+                          << Gamma << " " << f << endl;
+        
+        phi_HeI_nP_S[n].Set_atomic_data_Gamma(nu21, lam21, A21, f, Gamma, 4);
+    }
+    
+    //===========================================================
+    // Transition-Data for n^3 P_1 - 1^1 S_0
+    //===========================================================
+    for(int n=2; n<=(int)min(nS, n_HeI_add_Intercomb); n++)
+    {
+        A21=Trip.Level(n, 1, 1).Get_A21(1, 0, 0, 0);
+        nu21=Trip.Level(n, 1, 1).Get_nu21(1, 0, 0, 0);
+        lam21=Trip.Level(n, 1, 1).Get_lambda21(1, 0, 0, 0);
+        
+        Gamma=0.0;
+        for(int m=0; m<(int)Trip.Level(n, 1, 1).Get_n_down(); m++)
+        Gamma+=Trip.Level(n, 1, 1).Get_Trans_Data(m).A21;
+        
+        if(mflag>=1) cout << " Initializing profile for " << n
+                          << "^3 P_1 - 1^1 S_0 transition:"
+                          << nu21 << " " << lam21 << " " << A21 << " "
+                          << Gamma << " " << f << endl;
+        
+        phi_HeI_nP_T[n].Set_atomic_data_Gamma(nu21, lam21, A21, f, Gamma, 4);
+    }
+    
+    //===========================================================
+    // Transition-Data for n^1 D_1 - 1^1 S_0
+    //===========================================================
+    for(int n=3; n<=(int)min(nS, n_HeI_add_Quad); n++)
+    {
+        A21=Sing.Level(n, 2).Get_A21(1, 0, 0, 0);
+        nu21=Sing.Level(n, 2).Get_nu21(1, 0, 0, 0);
+        lam21=Sing.Level(n, 2).Get_lambda21(1, 0, 0, 0);
+        
+        Gamma=0.0;
+        for(int m=0; m<(int)Sing.Level(n, 2).Get_n_down(); m++)
+        Gamma+=Sing.Level(n, 2).Get_Trans_Data(m).A21;
+        
+        if(mflag>=1) cout << " Initializing profile for " << n
+                          << "^1 D_1 - 1^1 S_0 transition:"
+                          << nu21 << " " << lam21 << " " << A21 << " "
+                          << Gamma << " " << f << endl;
+        
+        phi_HeI_nD_S[n].Set_atomic_data_Gamma(nu21, lam21, A21, f, Gamma, 4);
+    }
+
     return;
 }
 
@@ -2816,7 +2845,7 @@ int Gas_of_HeI_Atoms::Get_Level_index(int n, int l, int s, int j) const
     else if(s==1 && n<=njresolved) return Trip.Get_Level_index(n, l, j)+indexT;
     else if(s==1 && n>njresolved) return Trip_no_j.Get_Level_index(n, l)+indexT_no_j;
     
-    cerr << " Get_as_of_HeI_Atoms::Get_Level_index: No level with (n, l, s, j)= ("
+    cerr << " Gas_of_HeI_Atoms::Get_Level_index: No level with (n, l, s, j)= ("
          << n << ", " << l << ", " << s << ", " << j << ")!!! " << endl;
     exit(0);
     
@@ -3088,7 +3117,9 @@ double Gas_of_HeI_Atoms::R_ic(int i, double T_g)
 {
     int n=Get_n(i), l=Get_l(i), s=Get_S(i);
     bool include_stim=1;
-    double facBauman=(Get_J(i)!=-10 && switch_Bauman ? (2.0*Get_J(i)+1.0)/(2.0*l+1.0)/(2.0*s+1.0) : 1.0);
+    double facBauman=(Get_J(i)!=-10 && switch_Bauman ? (2.0*Get_J(i)+1.0)/(2.0*l+1.0)/(2.0*s+1.0) : 1.0)*this->rate_scale_B;
+    double Tg0=T_g; // important for using detailed balance cases below to avoid applying energy rescaling doubly
+    T_g/=this->energy_scale;
     
     if(n<=10)
     {
@@ -3109,8 +3140,9 @@ double Gas_of_HeI_Atoms::R_ic(int i, double T_g)
         if(s==0 && ((n==4 && l==3) ||
                     (n==5 && l==3) || (n==5 && l==4)) )
         {
-            double Ric=Smits_Rec_Rate(n, l, s, T_g)/Ni_NeNc_LTE(i, T_g);
-            if(include_stim) Ric*=1.0+1.0/(exp( min(700.0, const_h_kb*Get_nu_ion(i)/T_g))-1.0);
+            // unrescaled values needed and *only* T_g rescaled --> undo changes in Ni_NeNc_LTE [JC]
+            double Ric=Smits_Rec_Rate(n, l, s, T_g)/Ni_NeNc_LTE(i, Tg0)/pow(get_ME_scale(), 1.5);
+            if(include_stim) Ric*=1.0+1.0/(exp( min(700.0, const_h_kb*Get_nu_ion(i)/Tg0))-1.0);
             
             return facBauman*Ric;
         }
@@ -3118,13 +3150,15 @@ double Gas_of_HeI_Atoms::R_ic(int i, double T_g)
         if(s==1 && ((n==4 && l==1) || (n==4 && l==3) ||
                     (n==5 && l==1) || (n==5 && l==3) || (n==5 && l==4)) )
         {
-            double Ric=Smits_Rec_Rate(n, l, s, T_g)/Ni_NeNc_LTE(i, T_g);
-            if(include_stim) Ric*=1.0+1.0/(exp( min(700.0, const_h_kb*Get_nu_ion(i)/T_g))-1.0);
+            // unrescaled values needed and *only* T_g rescaled --> undo changes in Ni_NeNc_LTE [JC]
+            double Ric=Smits_Rec_Rate(n, l, s, T_g)/Ni_NeNc_LTE(i, Tg0)/pow(get_ME_scale(), 1.5);
+            if(include_stim) Ric*=1.0+1.0/(exp( min(700.0, const_h_kb*Get_nu_ion(i)/Tg0))-1.0);
             Ric*=Get_gw(i)/3.0/(2.0*l+1.0);  // factor from j average
             
             // setting like for Rubino-Martion et al paper
-            //double Ric=Smits_Rec_Rate(n, l, s, T_g)/Trip.Level(n, l, l+1).Ni_NeNc_LTE(T_g);
-            //if(include_stim) Ric*=1.0+1.0/(exp( min(700.0, const_h_kb*Trip.Level(n, l, l+1).Get_nu_ion()/T_g))-1.0);
+            // unrescaled values needed and *only* T_g rescaled --> undo changes in Ni_NeNc_LTE [JC]
+            //double Ric=Smits_Rec_Rate(n, l, s, T_g)/Trip.Level(n, l, l+1).Ni_NeNc_LTE(Tg0)/pow(get_ME_scale(), 1.5);
+            //if(include_stim) Ric*=1.0+1.0/(exp( min(700.0, const_h_kb*Trip.Level(n, l, l+1).Get_nu_ion()/Tg0))-1.0);
             //Ric*=(2.0*(l+1.0)+1.0)/3.0/(2.0*l+1.0);
             
             return facBauman*Ric;
@@ -3134,7 +3168,7 @@ double Gas_of_HeI_Atoms::R_ic(int i, double T_g)
     //===============================================================================
     // Hydrogenic coefficients
     //===============================================================================
-    double nucHe=Get_nu_ion(i), nucH=Interaction_with_Photons_SH_QSP[n-1][l].Get_nu_ionization();
+    double nucHe=Get_nu_ion(i), nucH=Interaction_with_Photons_SH_QSP[n-1][l].Get_nu_ionization()*this->energy_scale;
     double chi=nucHe/nucH;
 
     return facBauman*pow(chi, 3)*Interaction_with_Photons_SH_QSP[n-1][l].R_nl_c_Int(T_g/chi);
@@ -3146,6 +3180,7 @@ double Gas_of_HeI_Atoms::R_ic(int n, int l, int s, int j, double T_g)
 //===================================================================================
 // use Saha relation
 //===================================================================================
+// no explicit change needed for rescaling as everything is rescaled internally [JC]
 double Gas_of_HeI_Atoms::R_ci(int i, double T_g)
 { return R_ic(i, T_g)*Ni_NeNc_LTE(i, T_g); }
 
@@ -3157,10 +3192,11 @@ double Gas_of_HeI_Atoms::R_ci(int n, int l, int s, int j, double T_g)
 //===================================================================================
 double Gas_of_HeI_Atoms::sig_ic_Hyd(int i, double nu)
 {
-    int n=Get_n(i), l=Get_l(i);
-    double facBauman=(Get_J(i)!=-10 && switch_Bauman ? (2.0*Get_J(i)+1.0)/(2.0*l+1.0)/(2.0*Get_S(i)+1.0) : 1.0);
+    int n=Get_n(i), l=Get_l(i), s=Get_S(i);
+    double facBauman=(Get_J(i)!=-10 && switch_Bauman ? (2.0*Get_J(i)+1.0)/(2.0*l+1.0)/(2.0*s+1.0) : 1.0)*this->sig_scale;
+    nu/=this->energy_scale;
     
-    double nucHe=Get_nu_ion(i), nucH=Interaction_with_Photons_SH_QSP[n-1][l].Get_nu_ionization();
+    double nucHe=Get_nu_ion(i), nucH=Interaction_with_Photons_SH_QSP[n-1][l].Get_nu_ionization()*this->energy_scale;
     double chi=nucHe/nucH;
     return facBauman*Interaction_with_Photons_SH_QSP[n-1][l].sig_phot_ion_lim(nu/chi);
 }
@@ -3170,7 +3206,9 @@ double Gas_of_HeI_Atoms::sig_ic(int i, double nu, double Tg)
     //return sig_ic_Hyd(i, nu);
     
     int n=Get_n(i), l=Get_l(i), s=Get_S(i);
-    double facBauman=(Get_J(i)!=-10 && switch_Bauman ? (2.0*Get_J(i)+1.0)/(2.0*l+1.0)/(2.0*s+1.0) : 1.0);
+    double facBauman=(Get_J(i)!=-10 && switch_Bauman ? (2.0*Get_J(i)+1.0)/(2.0*l+1.0)/(2.0*s+1.0) : 1.0)*this->sig_scale;
+    nu/=this->energy_scale;
+    Tg/=this->energy_scale;
     
     if(n<=10)
     {
@@ -3191,7 +3229,7 @@ double Gas_of_HeI_Atoms::sig_ic(int i, double nu, double Tg)
         if(s==0 && ((n==4 && l==3) ||
                     (n==5 && l==3) || (n==5 && l==4)) )
         {
-            double nucHe=Get_nu_ion(i), nucH=Interaction_with_Photons_SH_QSP[n-1][l].Get_nu_ionization();
+            double nucHe=Get_nu_ion(i), nucH=Interaction_with_Photons_SH_QSP[n-1][l].Get_nu_ionization()*this->energy_scale;
             if(nu<nucHe) return 0.0;
             double chi=nucHe/nucH;
             
@@ -3202,6 +3240,7 @@ double Gas_of_HeI_Atoms::sig_ic(int i, double nu, double Tg)
             
             if(Tg!=Tg_norm_ref[index_norm])
             {
+                // no rescaling other than temperature needed here!
                 double RicS=R_ic(i, Tg);
                 double RicH=pow(chi, 3)*Interaction_with_Photons_SH_QSP[n-1][l].R_nl_c_Int(Tg/chi);
 
@@ -3215,7 +3254,7 @@ double Gas_of_HeI_Atoms::sig_ic(int i, double nu, double Tg)
         if(s==1 && ((n==4 && l==1) || (n==4 && l==3) ||
                     (n==5 && l==1) || (n==5 && l==3) || (n==5 && l==4)) )
         {
-            double nucHe=Get_nu_ion(i), nucH=Interaction_with_Photons_SH_QSP[n-1][l].Get_nu_ionization();
+            double nucHe=Get_nu_ion(i), nucH=Interaction_with_Photons_SH_QSP[n-1][l].Get_nu_ionization()*this->energy_scale;
             if(nu<nucHe) return 0.0;
             double chi=nucHe/nucH;
             
@@ -3228,6 +3267,7 @@ double Gas_of_HeI_Atoms::sig_ic(int i, double nu, double Tg)
             
             if(Tg!=Tg_norm_ref[index_norm])
             {
+                // no rescaling other than temperature needed here!
                 double RicS=R_ic(i, Tg);
                 double RicH=pow(chi, 3)*Interaction_with_Photons_SH_QSP[n-1][l].R_nl_c_Int(Tg/chi);
                 
@@ -3242,7 +3282,7 @@ double Gas_of_HeI_Atoms::sig_ic(int i, double nu, double Tg)
     //===============================================================================
     // Hydrogenic value
     //===============================================================================
-    double nucHe=Get_nu_ion(i), nucH=Interaction_with_Photons_SH_QSP[n-1][l].Get_nu_ionization();
+    double nucHe=Get_nu_ion(i), nucH=Interaction_with_Photons_SH_QSP[n-1][l].Get_nu_ionization()*this->energy_scale;
     double chi=nucHe/nucH;
     
     return facBauman*Interaction_with_Photons_SH_QSP[n-1][l].sig_phot_ion_lim(nu/chi);
@@ -3250,3 +3290,161 @@ double Gas_of_HeI_Atoms::sig_ic(int i, double nu, double Tg)
 
 //===================================================================================
 //===================================================================================
+//
+//                   Rescaling functions for Helium by Luke Hart
+// 
+//===================================================================================
+//===================================================================================
+
+//===================================================================================
+// Scaling functions for the electron level states
+//===================================================================================
+void Electron_Level_HeI_Singlet::rescale_level(double alpha_scale, double me_scale) {
+    
+    // Firstly we need to set the values of the level and create rescaling ratios
+    double aratio = alpha_scale/this->FSC_scale;
+    double mratio = me_scale/this->ME_scale;
+    double E_scale = pow(aratio,2)*mratio;
+    double Dipole_scale = pow(aratio,5)*mratio;
+    
+    // Now rescale the member variables
+    this->DE *= E_scale;
+    this->Dnu *= E_scale;
+    this->nuion *= E_scale;
+    this->Eion *= E_scale;
+    this->Eion_ergs *= E_scale;
+    
+    for (vector<Transition_Data_HeI_A>::iterator x = A_values.begin(); x != A_values.end(); ++x) {
+        x->Dnu *= E_scale; x->DE *= E_scale; x->A21 *= Dipole_scale; x->lambda21 /= E_scale;
+        
+        // This means that the quadropole states (Dl = 0, 2, -2) are further scaled by alpha squared
+        if (this->ll-x->lp == 0 || this->ll-x->lp == 2 || x->lp-this->ll == 2) {
+            x->A21 *= pow(aratio,2);
+        }
+    }
+    this->FSC_scale = alpha_scale;
+    this->ME_scale = me_scale;
+    return;
+}
+
+void Electron_Level_HeI_Triplet::rescale_level(double alpha_scale, double me_scale) {
+    
+    // Firstly we need to set the values of the level and create rescaling ratios
+    double aratio = alpha_scale/this->FSC_scale;
+    double mratio = me_scale/this->ME_scale;
+    double E_scale = pow(aratio,2)*mratio;
+    double Dipole_scale = pow(aratio,5)*mratio;
+    
+    // Now rescale the member variables
+    this->DE *= E_scale;
+    this->Dnu *= E_scale;
+    this->nuion *= E_scale;
+    this->Eion *= E_scale;
+    this->Eion_ergs *= E_scale;
+    
+    for (vector<Transition_Data_HeI_A>::iterator x = A_values.begin(); x != A_values.end(); ++x) {
+        x->Dnu *= E_scale; x->DE *= E_scale; x->A21 *= Dipole_scale; x->lambda21 /= E_scale;
+    }
+
+    this->FSC_scale = alpha_scale;
+    this->ME_scale = me_scale;
+    return;
+}
+
+void Electron_Level_HeI_Triplet_no_j::rescale_level(double alpha_scale, double me_scale) {
+    
+    // Firstly we need to set the values of the level and create rescaling ratios
+    double aratio = alpha_scale/this->FSC_scale;
+    double mratio = me_scale/this->ME_scale;
+    double E_scale = pow(aratio,2)*mratio;
+    double Dipole_scale = pow(aratio,5)*mratio;
+    
+    // Now rescale the member variables
+    this->DE *= E_scale;
+    this->Dnu *= E_scale;
+    this->nuion *= E_scale;
+    this->Eion *= E_scale;
+    this->Eion_ergs *= E_scale;
+    
+    for (vector<Transition_Data_HeI_A>::iterator x = A_values.begin(); x != A_values.end(); ++x) {
+        x->Dnu *= E_scale; x->DE *= E_scale; x->A21 *= Dipole_scale; x->lambda21 /= E_scale;
+    }
+    this->FSC_scale = alpha_scale;
+    this->ME_scale = me_scale;
+    return;
+}
+
+//==============================================================================
+// Scaling functions for the atomic shells
+//==============================================================================
+void Atomic_Shell_HeI_Singlet::rescale_shell(double alpha_scale, double me_scale) {
+    for (vector<Electron_Level_HeI_Singlet>::iterator x = Angular_Momentum_Level.begin(); x != Angular_Momentum_Level.end(); ++x) {
+        x->rescale_level(alpha_scale, me_scale);
+    }
+    return;
+}
+
+void Atomic_Shell_HeI_Triplet::rescale_shell(double alpha_scale, double me_scale) {
+    for (vector<vector<Electron_Level_HeI_Triplet> >::iterator y = Angular_Momentum_Level.begin(); y != Angular_Momentum_Level.end(); ++y) {
+        for (vector<Electron_Level_HeI_Triplet>::iterator x = y->begin(); x!= y->end(); ++x) {
+            x->rescale_level(alpha_scale, me_scale);
+        }
+    }
+    return;
+}
+
+void Atomic_Shell_HeI_Triplet_no_j::rescale_shell(double alpha_scale, double me_scale) {
+    for (vector<Electron_Level_HeI_Triplet_no_j>::iterator x = Angular_Momentum_Level.begin(); x != Angular_Momentum_Level.end(); ++x) {
+        x->rescale_level(alpha_scale, me_scale);
+    }
+    return;
+}
+
+//==============================================================================
+// Scaling functions for the atoms created from the shells
+//==============================================================================
+void Atom_HeI_Singlet::rescale_atom(double alpha_scale, double me_scale) {
+    for (vector<Atomic_Shell_HeI_Singlet>::iterator x = Shell.begin(); x!= Shell.end(); ++x) {
+        x->rescale_shell(alpha_scale, me_scale);
+    }
+    return;
+}
+
+void Atom_HeI_Triplet::rescale_atom(double alpha_scale, double me_scale) {
+    for (vector<Atomic_Shell_HeI_Triplet>::iterator x = Shell.begin(); x!= Shell.end(); ++x) {
+        x->rescale_shell(alpha_scale, me_scale);
+    }
+    return;
+}
+
+void Atom_HeI_Triplet_no_j::rescale_atom(double alpha_scale, double me_scale) {
+    for (vector<Atomic_Shell_HeI_Triplet_no_j>::iterator x = Shell.begin(); x!= Shell.end(); ++x) {
+        x->rescale_shell(alpha_scale, me_scale);
+    }
+    return;
+        }
+
+//==============================================================================
+// Scaling function for a helium gas
+//==============================================================================
+void Gas_of_HeI_Atoms::rescale_gas(double alpha_scale, double me_scale)
+{
+    // Rescale the singlet, triplet and triplet atoms without J
+    // Then this should rescale Helium effectively
+    this->Sing.rescale_atom(alpha_scale, me_scale);
+    this->Trip.rescale_atom(alpha_scale, me_scale);
+    this->Trip_no_j.rescale_atom(alpha_scale, me_scale);
+    
+    // Need to reinitialise the Voigt profiles
+    this->voigt_init(this->Get_nShells());
+    HILyc.rescale_phot(alpha_scale, me_scale); // rescale Ly-c crossection [JC, March 6th, 2017]
+    
+    // to compute rescaled photo_ionization and recombination rates
+    this->FSC_scale = alpha_scale;
+    this->ME_scale = me_scale;
+    this->energy_scale = pow(alpha_scale,2)*me_scale;
+    this->sig_scale = pow(alpha_scale,-1)*pow(me_scale,-2);
+    this->rate_scale_B = pow(alpha_scale,5)*me_scale;
+    
+    return;
+}
