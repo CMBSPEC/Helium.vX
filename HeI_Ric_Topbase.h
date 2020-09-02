@@ -23,7 +23,7 @@ void load_all_Topbase_data(string path);
 // photoionization rate in 1/sec
 //
 //===========================================================================================================
-double Ric_Topbase(int n, int l, int s, double Tg);
+double Ric_Topbase(int n, int l, int s, double nucHe, double Tg);
 
 //===========================================================================================================
 //
@@ -31,6 +31,16 @@ double Ric_Topbase(int n, int l, int s, double Tg);
 //
 //===========================================================================================================
 double sig_ic_Topbase(int n, int l, int s, double nu);
+
+//===========================================================================================================
+//
+// recombination rate integral int (nu/c)^2 sig_nu exp(xce-xe) (1+ng) d nu
+//
+//===========================================================================================================
+double Ici_Topbase(int n, int l, int s, double nucHe, double Tg, double rho=1.0);
+
+// gT=f(T) exp(-xce)
+double Rci_Topbase(int n, int l, int s, double gT, double nucHe, double Tg, double rho=1.0);
 
 #endif
 

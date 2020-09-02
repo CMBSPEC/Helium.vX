@@ -20,8 +20,7 @@
 using namespace std;
 
 int mess_Topbase=0;
-double nuc_fac_TopBase=1.0e+10;   // old calculations used == 2.0 and ==10.0
-int npol=2;
+const double nuc_fac_TopBase=1.0e+10;   // old calculations used == 2.0 and ==10.0
 
 //===========================================================================================================
 // convert the crossections into Ric
@@ -144,7 +143,8 @@ void load_Topbase_data(string fname, double Ec, vector<TopBase_Level_data> &TD)
         d2= strtod(pEnd,NULL);
         
         dum.lgnu_Hz.push_back(log(d1*const_Ry_inf_icm*const_cl));  // conversion E/Ryd --> Hz
-        dum.lgsig_ic.push_back(log(d2*1.0e-18));                   // conversion Mbarn --> cm^2
+        // some of the table values are ==0.0 so make sure to not have that...
+        dum.lgsig_ic.push_back(log(d2*1.0e-18+1.0e-300));          // conversion Mbarn --> cm^2
     }
     
     TD.push_back(dum);
@@ -170,127 +170,19 @@ void load_all_Topbase_data(string path)
 }
 
 //===========================================================================================================
-//
-// compute Ric
-//
-//===========================================================================================================
-struct TopBase_integration_data
+double interpolate_Topbase(double lgnu,
+                               const vector<double> &lgnu_Hz,
+                               const vector<double> &lgsig,
+                               long unsigned int np)
 {
-    TopBase_Level_data *TDp;
-    int np;
-    double Tg;
-};
+    long unsigned int j=0;
+    // find index corresponding to x (start at i=istart)
+    locate_JC(&lgnu_Hz[0], np, lgnu, &j);
+    if(j<0 || j==np-1) throw_error("interpolate_Topbase", "out of bound", 1);
 
-double N_nu_pl_Topbase(double nu, double Tg)
-{ return 2.0*pow(nu/const_cl, 2)/( exp( min(700.0, const_h_kb*nu/Tg) )-1.0); }
+    double dlnsig_dln_nu=(lgsig[j+1]-lgsig[j])/(lgnu_Hz[j+1]-lgnu_Hz[j]);
 
-//===========================================================================================================
-double dRic_lin(double lgnu, void *p)
-{
-    TopBase_integration_data *d=((TopBase_integration_data *) p);
-    
-    double nu=exp(lgnu), y=0, dy=0;
-    polint_JC(&(d->TDp->lgnu_Hz[0]), &(d->TDp->lgsig_ic[0]), d->np, lgnu, npol, &y, &dy);
-    
-    return nu*exp(y)*N_nu_pl_Topbase(nu, d->Tg);
-}
-
-double integrate_Ric_Patt(TopBase_Level_data &TD, double Ec, double Tg)
-{
-    TopBase_integration_data d;
-    d.Tg=Tg;
-    d.TDp=&TD;
-    d.np=TD.lgnu_Hz.size();
-    void *p=&d;
-    
-    double r=0.0;
-    double epsrel=1.0e-5, epsabs=1.0e-20;
-    double nuc=Ec*const_Ry_inf_icm*const_cl, num=min(nuc*nuc_fac_TopBase, exp(TD.lgnu_Hz.back()));
-    double ab=log(nuc), bb=log(num);
-    
-    r=Integrate_using_Patterson_adaptive(ab, bb, epsrel, epsabs, dRic_lin, p);
-    
-    return FOURPI*r;
-}
-
-//===========================================================================================================
-double dRic_lin_Grid(int i, void *p)
-{
-    TopBase_integration_data *d=((TopBase_integration_data *) p);
-    
-    double nu=exp(d->TDp->lgnu_Hz[i]);
-    double sig_nu=exp(d->TDp->lgsig_ic[i]);
-    
-    return nu*sig_nu*N_nu_pl_Topbase(nu, d->Tg);
-}
-
-double integrate_Ric_Grid(TopBase_Level_data &TD, double Ec, double Tg)
-{
-    TopBase_integration_data d;
-    d.Tg=Tg;
-    d.TDp=&TD;
-    d.np=TD.lgnu_Hz.size();
-    void *p=&d;
-    
-    double nuc=Ec*const_Ry_inf_icm*const_cl, num=min(nuc*nuc_fac_TopBase, exp(TD.lgnu_Hz.back()));
-    int n_int=50000;
-    double ab=log(nuc), bb=log(num), db=(bb-ab)/n_int;
-    
-    // simple trapezoidal rule
-    double r=0.5*(dRic_lin(ab, p)+dRic_lin(bb, p));
-    for(int k=1; k<n_int; k++) r+=dRic_lin(ab+k*db, p);
-    
-    return FOURPI*db*r;
-}
-
-//===========================================================================================================
-double integrate_Ric(TopBase_Level_data &TD, double Ec, double Tg)
-{
-    return integrate_Ric_Patt(TD, Ec, Tg);
-    //1 0.7280330516
-    //2 7.782295147
-
-    //return integrate_Ric_Grid(TD, Ec, Tg);
-    // 5000
-    //1 0.7280449241
-    //2 7.782455593
-    // 10000
-    //1 0.7280361026
-    //2 7.782364343
-    // 15000
-    //1 0.7280344693
-    //2 7.782347446
-    // 50000
-    //1 0.7280332804
-    //2 7.782335146
-}
-
-//===========================================================================================================
-//
-// photoionization rate in 1/sec
-//
-//===========================================================================================================
-double Ric_Topbase(int n, int l, int s, double Tg)
-{
-    int i;
-    if(s==0)
-    {
-        for(i=0; i<(int)TopBase_Level_data_S.size(); i++)
-            if(TopBase_Levels_S[i].n==n && TopBase_Levels_S[i].l==l) break;
-        
-        return integrate_Ric(TopBase_Level_data_S[i], TopBase_Levels_S[i].Ec, Tg);
-    }
-    else if(s==1)
-    {
-        for(i=0; i<(int)TopBase_Level_data_T.size(); i++)
-            if(TopBase_Levels_T[i].n==n && TopBase_Levels_T[i].l==l) break;
-        
-        return integrate_Ric(TopBase_Level_data_T[i], TopBase_Levels_T[i].Ec, Tg);
-    }
-    else{ cerr << " no Topbase data found for (n, l, s) == ("
-               << n << ", " << l << ", " << s << ")! Exiting... " << endl; exit(0); }
-    
-    return 0.0;
+    return exp(lgsig[j]+dlnsig_dln_nu*(lgnu-lgnu_Hz[j]));
 }
 
 //===========================================================================================================
@@ -301,41 +193,207 @@ double Ric_Topbase(int n, int l, int s, double Tg)
 double sig_ic_Topbase(int n, int l, int s, double nu)
 {
     int i;
-    double y=0, dy=0;
+
+    if(s==0)
+    {
+        for(i=0; i<(int)TopBase_Level_data_S.size(); i++)
+            if(TopBase_Levels_S[i].n==n && TopBase_Levels_S[i].l==l) break;
+
+        if(TopBase_Levels_S[i].Ec*const_Ry_inf_icm*const_cl>nu) return 0;
+
+        return interpolate_Topbase(log(nu),
+                                TopBase_Level_data_S[i].lgnu_Hz,
+                                TopBase_Level_data_S[i].lgsig_ic,
+                                TopBase_Level_data_S[i].lgnu_Hz.size());
+    }
+    else if(s==1)
+    {
+        for(i=0; i<(int)TopBase_Level_data_T.size(); i++)
+            if(TopBase_Levels_T[i].n==n && TopBase_Levels_T[i].l==l) break;
+
+        if(TopBase_Levels_T[i].Ec*const_Ry_inf_icm*const_cl>nu) return 0;
+
+        return interpolate_Topbase(log(nu),
+                                       TopBase_Level_data_T[i].lgnu_Hz,
+                                       TopBase_Level_data_T[i].lgsig_ic,
+                                       TopBase_Level_data_T[i].lgnu_Hz.size());
+    }
+    else{ cerr << " no Topbase data found for (n, l, s) == ("
+               << n << ", " << l << ", " << s << ")! Exiting... " << endl; exit(0); }
+
+    return 0.0;
+}
+
+//===========================================================================================================
+//
+// compute Ric
+//
+//===========================================================================================================
+struct TopBase_integration_data
+{
+    const TopBase_Level_data *TDp;
+    int np;
+    double Tg, rho, nuc;
+};
+
+//===========================================================================================================
+double dRic_lin(double lgnu, void *p)
+{
+    TopBase_integration_data *d=((TopBase_integration_data *) p);
     
+    double nu=exp(lgnu);
+    double sig_nu=interpolate_Topbase(lgnu, d->TDp->lgnu_Hz, d->TDp->lgsig_ic, d->np);
+    double Tg=d->Tg, x=const_h_kb*nu/Tg, xc=const_h_kb*d->nuc/Tg;
+
+    return nu*pow(nu/const_cl, 2)*sig_nu*exp(xc-x)/one_minus_exp_mx(x);
+}
+
+//===========================================================================================================
+double integrate_Ric_Patt(const TopBase_Level_data &TD, double Ec, double nucHe, double Tg)
+{
+    TopBase_integration_data d;
+    d.nuc=Ec*const_Ry_inf_icm*const_cl;
+    d.TDp=&TD;
+    d.np=TD.lgnu_Hz.size();
+
+    double T_scale=d.nuc/nucHe;  // to fix the small mismatch in the level energies use Tg
+    Tg*=T_scale;
+    d.Tg=Tg;
+
+    double r=0.0;
+    double epsrel=1.0e-5, epsabs=1.0e-30;
+    double nuc=d.nuc, num=min(nuc*nuc_fac_TopBase, exp(TD.lgnu_Hz.back()));
+    double ab=nuc, bb=num;
+    
+    //-------------------------------------------------------------------
+    // recombination cross section exponentially cuts of for x-xi >> 1
+    //-------------------------------------------------------------------
+    double nu_x=const_h_kb/Tg, xc=nu_x*d.nuc;
+    if(xc>=3.0) bb=min(bb, (xc -log(1.0e-30))/nu_x);
+    else bb=min(bb, (3.0-log(1.0e-30))/nu_x);
+
+    r=Integrate_using_Patterson_adaptive(log(ab), log(bb), epsrel, epsabs, dRic_lin, &d);
+
+    return 2.0*FOURPI*r*pow(T_scale, -3)*exp(-xc);
+}
+
+//===========================================================================================================
+double integrate_Ric(const TopBase_Level_data &TD, double Ec, double nucHe, double Tg)
+{ return integrate_Ric_Patt(TD, Ec, nucHe, Tg); }
+
+//===========================================================================================================
+//
+// photoionization rate in 1/sec
+//
+//===========================================================================================================
+double Ric_Topbase(int n, int l, int s, double nucHe, double Tg)
+{
+    int i;
     if(s==0)
     {
         for(i=0; i<(int)TopBase_Level_data_S.size(); i++)
             if(TopBase_Levels_S[i].n==n && TopBase_Levels_S[i].l==l) break;
         
-        if(TopBase_Levels_S[i].Ec*const_Ry_inf_icm*const_cl>nu) return 0;
-        
-        polint_JC(&(TopBase_Level_data_S[i].lgnu_Hz[0]),
-                  &(TopBase_Level_data_S[i].lgsig_ic[0]),
-                  TopBase_Level_data_S[i].lgnu_Hz.size(),
-                  log(nu), npol, &y, &dy);
-        
-        return exp(y);
+        return integrate_Ric(TopBase_Level_data_S[i], TopBase_Levels_S[i].Ec, nucHe, Tg);
     }
     else if(s==1)
     {
         for(i=0; i<(int)TopBase_Level_data_T.size(); i++)
             if(TopBase_Levels_T[i].n==n && TopBase_Levels_T[i].l==l) break;
         
-        if(TopBase_Levels_T[i].Ec*const_Ry_inf_icm*const_cl>nu) return 0;
-
-        polint_JC(&(TopBase_Level_data_T[i].lgnu_Hz[0]),
-                  &(TopBase_Level_data_T[i].lgsig_ic[0]),
-                  TopBase_Level_data_T[i].lgnu_Hz.size(),
-                  log(nu), npol, &y, &dy);
-        
-        return exp(y);
+        return integrate_Ric(TopBase_Level_data_T[i], TopBase_Levels_T[i].Ec, nucHe, Tg);
     }
     else{ cerr << " no Topbase data found for (n, l, s) == ("
                << n << ", " << l << ", " << s << ")! Exiting... " << endl; exit(0); }
     
     return 0.0;
 }
+
+//===========================================================================================================
+//
+// compute Rci
+//
+//===========================================================================================================
+double dIci_lin(double lgnu, void *p)
+{
+    TopBase_integration_data *d=((TopBase_integration_data *) p);
+
+    double nu=exp(lgnu);
+    double sig_nu=interpolate_Topbase(lgnu, d->TDp->lgnu_Hz, d->TDp->lgsig_ic, d->np);
+    double Tg=d->Tg, x=const_h_kb*nu/Tg, xc=const_h_kb*d->nuc/Tg;
+
+    return nu*pow(nu/const_cl, 2)*sig_nu*exp((xc-x)/d->rho)*nbbp1_func(x);
+}
+
+//===========================================================================================================
+double integrate_Ici_Patt(const TopBase_Level_data &TD, double Ec, double nucHe, double Tg, double rho)
+{
+    TopBase_integration_data d;
+    d.nuc=Ec*const_Ry_inf_icm*const_cl;
+    d.rho=rho; // == Te/Tg
+    d.TDp=&TD;
+    d.np=TD.lgnu_Hz.size();
+
+    double T_scale=d.nuc/nucHe;  // to fix the small mismatch in the level energies use Tg
+    Tg*=T_scale;
+    d.Tg=Tg;
+
+    double r=0.0;
+    double epsrel=1.0e-5, epsabs=1.0e-30;
+    double nuc=d.nuc, num=min(nuc*nuc_fac_TopBase, exp(TD.lgnu_Hz.back()));
+    double ab=nuc, bb=num;
+
+    //-------------------------------------------------------------------
+    // recombination cross section exponentially cuts of for x-xi >> rho
+    //-------------------------------------------------------------------
+    double nu_x=const_h_kb/Tg, xc=nu_x*d.nuc;
+    if(xc/rho>=3.0) bb=min(bb, (xc -rho*log(1.0e-30))/nu_x);
+    else bb=min(bb, (3.0-rho*log(1.0e-30))/nu_x);
+
+    r=Integrate_using_Patterson_adaptive(log(ab), log(bb), epsrel, epsabs, dIci_lin, &d);
+
+    return 2.0*FOURPI*r*pow(T_scale, -3);
+}
+
+//===========================================================================================================
+//
+// recombination rate integral 8pi * int (nu/c)^2 sig_nu exp(xce-xe) (1+ng) d nu
+//
+//===========================================================================================================
+double integrate_Ici(const TopBase_Level_data &TD, double Ec, double nucHe, double Tg, double rho)
+{ return integrate_Ici_Patt(TD, Ec, nucHe, Tg, rho); }
+
+//===========================================================================================================
+//
+// recombination rate integral int ...
+//
+//===========================================================================================================
+double Ici_Topbase(int n, int l, int s, double nucHe, double Tg, double rho)
+{
+    int i;
+    if(s==0)
+    {
+        for(i=0; i<(int)TopBase_Level_data_S.size(); i++)
+            if(TopBase_Levels_S[i].n==n && TopBase_Levels_S[i].l==l) break;
+
+        return integrate_Ici(TopBase_Level_data_S[i], TopBase_Levels_S[i].Ec, nucHe, Tg, rho);
+    }
+    else if(s==1)
+    {
+        for(i=0; i<(int)TopBase_Level_data_T.size(); i++)
+            if(TopBase_Levels_T[i].n==n && TopBase_Levels_T[i].l==l) break;
+
+        return integrate_Ici(TopBase_Level_data_T[i], TopBase_Levels_T[i].Ec, nucHe, Tg, rho);
+    }
+    else{ cerr << " no Topbase data found for (n, l, s) == ("
+               << n << ", " << l << ", " << s << ")! Exiting... " << endl; exit(0); }
+
+    return 0.0;
+}
+
+// gT=f(T) exp(-xce)
+double Rci_Topbase(int n, int l, int s, double gT, double nucHe, double Tg, double rho)
+{ return gT*Ici_Topbase(n, l, s, nucHe, Tg, rho); }
 
 //===========================================================================================================
 //===========================================================================================================

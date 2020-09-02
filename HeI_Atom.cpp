@@ -955,16 +955,22 @@ void Electron_Level_HeI_Singlet::Set_xxx_Transition_Data(int m, int d, double v)
 //==============================================================================
 // Saha-relations with continuum
 //==============================================================================
-// f(T) == (Ni/[Ne Nc])_LTE
-double Electron_Level_HeI_Singlet::Ni_NeNc_LTE(double TM) const
+// g(T) == (Ni/[Ne Nc])_LTE  * exp(-xc)
+double Electron_Level_HeI_Singlet::Ni_NeNc_LTE_expmxc(double TM) const
 {
     // HeI --> gc=2 --> ge*gc=4
     // 30.07.2015: added reduced mass factor
     // factors for variation of fundamental constants: energy rescaled internally; just red. mass needed!
     return gw/4.0*pow(const_lambdac, 3)
-                 *pow(2.0*PI*const_kb_mec2*Get_mu_red()*get_ME_scale()*TM, -1.5)
-                 *exp(Eion_ergs/const_kB/TM );
+                 *pow(2.0*PI*const_kb_mec2*Get_mu_red()*get_ME_scale()*TM, -1.5);
 }
+
+double Electron_Level_HeI_Singlet::expmxc(double TM) const
+{ return exp(-Eion_ergs/const_kB/TM ); }
+
+// f(T) == (Ni/[Ne Nc])_LTE
+double Electron_Level_HeI_Singlet::Ni_NeNc_LTE(double TM) const
+{ return Ni_NeNc_LTE_expmxc(TM)*exp(Eion_ergs/const_kB/TM); }
 
 double Electron_Level_HeI_Singlet::Xi_Saha(double Xe, double Xc, double NH, double TM) const
 { return Xe*Xc*NH*Ni_NeNc_LTE(TM); }
@@ -1327,16 +1333,22 @@ void Electron_Level_HeI_Triplet::Set_xxx_Transition_Data(int m, int d, double v)
 //==============================================================================
 // Saha-relations with continuum
 //==============================================================================
-// f(T) == (Ni/[Ne Nc])_LTE
-double Electron_Level_HeI_Triplet::Ni_NeNc_LTE(double TM) const
-{ 
+// g(T) == (Ni/[Ne Nc])_LTE  * exp(-xc)
+double Electron_Level_HeI_Triplet::Ni_NeNc_LTE_expmxc(double TM) const
+{
     // HeI --> gc=2 --> ge*gc=4
     // 30.07.2015: added reduced mass factor
     // factors for variation of fundamental constants: energy rescaled internally; just red. mass needed!
     return gw/4.0*pow(const_lambdac, 3)
-                 *pow(2.0*PI*const_kb_mec2*Get_mu_red()*get_ME_scale()*TM, -1.5)
-                 *exp(Eion_ergs/const_kB/TM );
+                 *pow(2.0*PI*const_kb_mec2*Get_mu_red()*get_ME_scale()*TM, -1.5);
 }
+
+double Electron_Level_HeI_Triplet::expmxc(double TM) const
+{ return exp(-Eion_ergs/const_kB/TM ); }
+
+// f(T) == (Ni/[Ne Nc])_LTE
+double Electron_Level_HeI_Triplet::Ni_NeNc_LTE(double TM) const
+{ return Ni_NeNc_LTE_expmxc(TM)*exp(Eion_ergs/const_kB/TM); }
 
 double Electron_Level_HeI_Triplet::Xi_Saha(double Xe, double Xc, double NH, double TM) const
 { return Xe*Xc*NH*Ni_NeNc_LTE(TM); }
@@ -1700,16 +1712,22 @@ void Electron_Level_HeI_Triplet_no_j::Set_xxx_Transition_Data(int m, int d, doub
 //==============================================================================
 // Saha-relations with continuum
 //==============================================================================
-// f(T) == (Ni/[Ne Nc])_LTE
-double Electron_Level_HeI_Triplet_no_j::Ni_NeNc_LTE(double TM) const
-{ 
+// g(T) == (Ni/[Ne Nc])_LTE  * exp(-xc)
+double Electron_Level_HeI_Triplet_no_j::Ni_NeNc_LTE_expmxc(double TM) const
+{
     // HeI --> gc=2 --> ge*gc=4
     // 30.07.2015: added reduced mass factor
     // factors for variation of fundamental constants: energy rescaled internally; just red. mass needed!
     return gw/4.0*pow(const_lambdac, 3)
-                 *pow(2.0*PI*const_kb_mec2*Get_mu_red()*get_ME_scale()*TM, -1.5)
-                 *exp(Eion_ergs/const_kB/TM );
+                 *pow(2.0*PI*const_kb_mec2*Get_mu_red()*get_ME_scale()*TM, -1.5);
 }
+
+double Electron_Level_HeI_Triplet_no_j::expmxc(double TM) const
+{ return exp(-Eion_ergs/const_kB/TM ); }
+
+// f(T) == (Ni/[Ne Nc])_LTE
+double Electron_Level_HeI_Triplet_no_j::Ni_NeNc_LTE(double TM) const
+{ return Ni_NeNc_LTE_expmxc(TM)*exp(Eion_ergs/const_kB/TM); }
 
 double Electron_Level_HeI_Triplet_no_j::Xi_Saha(double Xe, double Xc, double NH, double TM) const
 { return Xe*Xc*NH*Ni_NeNc_LTE(TM); }
@@ -1756,9 +1774,10 @@ void Atomic_Shell_HeI_Singlet::create_Electron_Levels()
     Electron_Level_HeI_Singlet v;
     // fill with empty electron-states
     for(int l=0; l<nn; l++) Angular_Momentum_Level.push_back(v);
+
     // now initialize each state
     for(int l=0; l<nn; l++) Angular_Momentum_Level[l].init(nn, l, mess_flag);
-    
+
     return;
 }
 
@@ -1975,9 +1994,12 @@ void Atom_HeI_Singlet::create_Shells()
     Atomic_Shell_HeI_Singlet v;
     // fill with empty shells
     for(int n=0; n<=nShells; n++) Shell.push_back(v);
+
+#pragma omp parallel for default(shared) schedule(dynamic)
     // create each shells
     for(int n=1; n<=nShells; n++) Shell[n].init(n, m);
-    
+#pragma omp barrier
+
     // add hydrogenic transitions for DM singlet gap
     if(nShells>=9)
     {
@@ -1991,10 +2013,12 @@ void Atom_HeI_Singlet::create_Shells()
         }
     }
     
+#pragma omp parallel for default(shared) schedule(dynamic)
     // add all hydrogenic transitions for levels with n>10
     for(int n=11; n<=nShells; n++)
         for(int l=0; l<n; l++) Level(n, l).Set_hydrogenic_transitions(*this);
-    
+#pragma omp barrier
+
     return;
 }
 
@@ -2145,9 +2169,12 @@ void Atom_HeI_Triplet::create_Shells()
     Atomic_Shell_HeI_Triplet v;
     // fill with empty shells
     for(int n=0; n<=nShells; n++) Shell.push_back(v);
+
+#pragma omp parallel for default(shared) schedule(dynamic)
     // create each shells
     for(int n=2; n<=nShells; n++) Shell[n].init(n, m); 
-    
+#pragma omp barrier
+
     // add hydrogenic transitions for DM triplet gap
     if(nShells>=8)
     {
@@ -2168,11 +2195,13 @@ void Atom_HeI_Triplet::create_Shells()
         }
     }
     
+#pragma omp parallel for default(shared) schedule(dynamic)
     // add all hydrogenic transitions for levels with n>10
     for(int n=11; n<=nShells; n++)
         for(int l=0; l<n; l++)
             for(int j=l-1; j<=l+1; j++)
                 Level(n, l, j).Set_hydrogenic_transitions(*this);
+#pragma omp barrier
 
     return;
 }
@@ -2354,13 +2383,18 @@ void Atom_HeI_Triplet_no_j::create_Shells()
     Atomic_Shell_HeI_Triplet_no_j v;
     // fill with empty shells
     for(int n=0; n<=nShells; n++) Shell.push_back(v);
+
+#pragma omp parallel for default(shared) schedule(dynamic)
     // create each shells
     for(int n=njresolved+1; n<=nShells; n++) Shell[n].init(n, njresolved, m);
-    
+#pragma omp barrier
+
+#pragma omp parallel for default(shared) schedule(dynamic)
     // add hydrogenic transitions for non-j-resolved --> j-resolved & non-j-resolved
     for(int n=njresolved+1; n<=nShells; n++)
         for(int l=0; l<n; l++) Level(n, l).Set_hydrogenic_transitions(*this);
-    
+#pragma omp barrier
+
     return;
 }
 
@@ -2550,6 +2584,7 @@ void Gas_of_HeI_Atoms::init(int nS, int njres, int nQ, int nTS, int mflag)
     energy_scale = 1.;
     sig_scale = 1.;
     rate_scale_B = 1.;
+    rate_scale_alpha = 1.;
 
     return;
 }
@@ -3005,6 +3040,26 @@ void Gas_of_HeI_Atoms::Set_xxx_Transition_Data(int i, int m, int d, double v)
 //===================================================================================
 // Saha-relations with continuum
 //===================================================================================
+double Gas_of_HeI_Atoms::Ni_NeNc_LTE_expmxc(int i, double TM) const
+{
+    if(i<indexT) return Sing.Level(i).Ni_NeNc_LTE_expmxc(TM);
+    else if(i<indexT_no_j) return Trip.Level(i-indexT).Ni_NeNc_LTE_expmxc(TM);
+    else if(i<nl) return Trip_no_j.Level(i-indexT_no_j).Ni_NeNc_LTE_expmxc(TM);
+
+    cout << " Gas_of_HeI_Atoms:: fail " << endl;
+    return 0.0;
+}
+
+double Gas_of_HeI_Atoms::expmxc(int i, double TM) const
+{
+    if(i<indexT) return Sing.Level(i).expmxc(TM);
+    else if(i<indexT_no_j) return Trip.Level(i-indexT).expmxc(TM);
+    else if(i<nl) return Trip_no_j.Level(i-indexT_no_j).expmxc(TM);
+
+    cout << " Gas_of_HeI_Atoms:: fail " << endl;
+    return 0.0;
+}
+
 double Gas_of_HeI_Atoms::Ni_NeNc_LTE(int i, double TM) const
 {
   if(i<indexT) return Sing.Level(i).Ni_NeNc_LTE(TM);
@@ -3092,14 +3147,22 @@ void Gas_of_HeI_Atoms::init_photoionization_rates(int mflag)
     // setup memory
     clear_Interaction_w_photons();
     Interaction_with_Photons_SH_QSP.resize(Get_nShells());
+
+#pragma omp parallel for default(shared) schedule(dynamic)
     for(int n=1; n<=Get_nShells(); n++)
     {
         Interaction_with_Photons_SH_QSP[n-1].resize(n);
         
         for(int l=0; l<n; l++)
-            Interaction_with_Photons_SH_QSP[n-1][l].init(n, l, 1.0, const_malpha_mp, mflag);
+            Interaction_with_Photons_SH_QSP[n-1][l].init_parallel(n, l, 1.0, const_malpha_mp, mflag);
     }
-    
+#pragma omp barrier
+
+    // for parallel setup this will cause problems if not done serial...
+    for(int n=1; n<=Get_nShells(); n++)
+        for(int l=0; l<n; l++)
+            Interaction_with_Photons_SH_QSP[n-1][l].arm_spline_parallel();
+
     if(mflag>0) cout << " Gas_of_HeI_Atoms::init_photoionization_rates: done with hydrogenic " << endl;
     
     // topbase data
@@ -3112,27 +3175,40 @@ void Gas_of_HeI_Atoms::init_photoionization_rates(int mflag)
 
 //===================================================================================
 // use hydrogenic value Ric = (nuHe/nuH)^3 * RicH(T*nucH/nucHe)
+//-----------------------------------------------------------------------------------
+// 29.08.2020: fixed rate computations to make things more transparent [JC]
 //===================================================================================
 double Gas_of_HeI_Atoms::R_ic(int i, double T_g)
 {
-    int n=Get_n(i), l=Get_l(i), s=Get_S(i);
     bool include_stim=1;
-    double facBauman=(Get_J(i)!=-10 && switch_Bauman ? (2.0*Get_J(i)+1.0)/(2.0*l+1.0)/(2.0*s+1.0) : 1.0)*this->rate_scale_B;
-    double Tg0=T_g; // important for using detailed balance cases below to avoid applying energy rescaling doubly
+
+    int n=Get_n(i), l=Get_l(i), s=Get_S(i), J=Get_J(i);
+    double nucHe=Get_nu_ion(i);
+    double facBauman=(J!=-10 && switch_Bauman ? (2.0*J+1.0)/(2.0*l+1.0)/(2.0*s+1.0) : 1.0);
+
+    facBauman*=this->rate_scale_B;
     T_g/=this->energy_scale;
-    
+
+    //-------------------------------------------------------------------------------
+    // Smits gave alpha_i(T) == f_i(T) beta_i(T) using DB.
+    //-------------------------------------------------------------------------------
+    // - stimulated terms likely not included in alpha_i --> (1+n_i) factor
+    // - numerically more stable version of 1/f_i(T)
+    //-------------------------------------------------------------------------------
+    double facSmits=expmxc(i, T_g)/Ni_NeNc_LTE_expmxc(i, T_g)*this->rate_scale_alpha;
+
     if(n<=10)
     {
         //===========================================================================
         // Topbase
         //===========================================================================
-        if(l==0) return facBauman*Ric_Topbase(n, l, s, T_g);
+        if(l==0) return facBauman*Ric_Topbase(n, l, s, nucHe, T_g);
         else if(l==1)
         {
-            if(s==0 && n<=9) return facBauman*Ric_Topbase(n, l, s, T_g);
-            if(s==1 && n<=3) return facBauman*Ric_Topbase(n, l, s, T_g);
+            if(s==0 && n<=9) return facBauman*Ric_Topbase(n, l, s, nucHe, T_g);
+            if(s==1 && n<=3) return facBauman*Ric_Topbase(n, l, s, nucHe, T_g);
         }
-        else if(l==2 && n<=9) return facBauman*Ric_Topbase(n, l, s, T_g);
+        else if(l==2 && n<=9) return facBauman*Ric_Topbase(n, l, s, nucHe, T_g);
         
         //===========================================================================
         // Smith recombination coefficients without stimulated recombination
@@ -3140,35 +3216,34 @@ double Gas_of_HeI_Atoms::R_ic(int i, double T_g)
         if(s==0 && ((n==4 && l==3) ||
                     (n==5 && l==3) || (n==5 && l==4)) )
         {
-            // unrescaled values needed and *only* T_g rescaled --> undo changes in Ni_NeNc_LTE [JC]
-            double Ric=Smits_Rec_Rate(n, l, s, T_g)/Ni_NeNc_LTE(i, Tg0)/pow(get_ME_scale(), 1.5);
-            if(include_stim) Ric*=1.0+1.0/(exp( min(700.0, const_h_kb*Get_nu_ion(i)/Tg0))-1.0);
+            double Ric=Smits_Rec_Rate(n, l, s, T_g);
+            // include stimulated recombination
+            if(include_stim) Ric*=nbbp1_func(const_h_kb*nucHe/T_g);
             
-            return facBauman*Ric;
+            return facSmits*Ric;
         }
         
         if(s==1 && ((n==4 && l==1) || (n==4 && l==3) ||
                     (n==5 && l==1) || (n==5 && l==3) || (n==5 && l==4)) )
         {
-            // unrescaled values needed and *only* T_g rescaled --> undo changes in Ni_NeNc_LTE [JC]
-            double Ric=Smits_Rec_Rate(n, l, s, T_g)/Ni_NeNc_LTE(i, Tg0)/pow(get_ME_scale(), 1.5);
-            if(include_stim) Ric*=1.0+1.0/(exp( min(700.0, const_h_kb*Get_nu_ion(i)/Tg0))-1.0);
+            double Ric=Smits_Rec_Rate(n, l, s, T_g);
+            // include stimulated recombination
+            if(include_stim) Ric*=nbbp1_func(const_h_kb*nucHe/T_g);
             Ric*=Get_gw(i)/3.0/(2.0*l+1.0);  // factor from j average
             
             // setting like for Rubino-Martion et al paper
-            // unrescaled values needed and *only* T_g rescaled --> undo changes in Ni_NeNc_LTE [JC]
-            //double Ric=Smits_Rec_Rate(n, l, s, T_g)/Trip.Level(n, l, l+1).Ni_NeNc_LTE(Tg0)/pow(get_ME_scale(), 1.5);
-            //if(include_stim) Ric*=1.0+1.0/(exp( min(700.0, const_h_kb*Trip.Level(n, l, l+1).Get_nu_ion()/Tg0))-1.0);
+            //double Ric=Smits_Rec_Rate(n, l, s, T_g);
+            //if(include_stim) Ric*=nbbp1_func(const_h_kb*Trip.Level(n, l, l+1).Get_nu_ion()/Tg0);
             //Ric*=(2.0*(l+1.0)+1.0)/3.0/(2.0*l+1.0);
             
-            return facBauman*Ric;
+            return facSmits*Ric;
         }
     }
     
     //===============================================================================
     // Hydrogenic coefficients
     //===============================================================================
-    double nucHe=Get_nu_ion(i), nucH=Interaction_with_Photons_SH_QSP[n-1][l].Get_nu_ionization()*this->energy_scale;
+    double nucH=Interaction_with_Photons_SH_QSP[n-1][l].Get_nu_ionization()*this->energy_scale;
     double chi=nucHe/nucH;
 
     return facBauman*pow(chi, 3)*Interaction_with_Photons_SH_QSP[n-1][l].R_nl_c_Int(T_g/chi);
@@ -3181,32 +3256,118 @@ double Gas_of_HeI_Atoms::R_ic(int n, int l, int s, int j, double T_g)
 // use Saha relation
 //===================================================================================
 // no explicit change needed for rescaling as everything is rescaled internally [JC]
-double Gas_of_HeI_Atoms::R_ci(int i, double T_g)
+double Gas_of_HeI_Atoms::R_ci_DB(int i, double T_g)
 { return R_ic(i, T_g)*Ni_NeNc_LTE(i, T_g); }
 
-double Gas_of_HeI_Atoms::R_ci(int n, int l, int s, int j, double T_g)
-{ return R_ci(Get_Level_index(n, l, s, j), T_g); }
+double Gas_of_HeI_Atoms::R_ci_DB(int n, int l, int s, int j, double T_g)
+{ return R_ci_DB(Get_Level_index(n, l, s, j), T_g); }
+
+//===================================================================================
+// use hydrogenic value Rci = (nuHe/nuH)^3 * RciH(T*nucH/nucHe)
+//===================================================================================
+double Gas_of_HeI_Atoms::R_ci(int i, double T_g, double rho)
+{
+    bool include_stim=1;
+
+    int n=Get_n(i), l=Get_l(i), s=Get_S(i), J=Get_J(i);
+    double nucHe=Get_nu_ion(i);
+    double facBauman=(J!=-10 && switch_Bauman ? (2.0*J+1.0)/(2.0*l+1.0)/(2.0*s+1.0) : 1.0);
+
+    facBauman*=this->rate_scale_alpha;
+    T_g/=this->energy_scale;
+
+    //-------------------------------------------------------------------------------
+    // g_i(T) = f_i(T) exp(-xce)
+    //-------------------------------------------------------------------------------
+    double gTi=Ni_NeNc_LTE_expmxc(i, T_g*rho);
+
+    //-------------------------------------------------------------------------------
+    // Smits gave alpha_i(T)
+    //-------------------------------------------------------------------------------
+    // - stimulated terms likely not included in alpha_i --> (1+n_i) factor
+    //-------------------------------------------------------------------------------
+    double facSmits=this->rate_scale_alpha;
+
+    if(n<=10)
+    {
+        //===========================================================================
+        // Topbase
+        //===========================================================================
+        if(l==0) return facBauman*Rci_Topbase(n, l, s, gTi, nucHe, T_g, rho);
+        else if(l==1)
+        {
+            if(s==0 && n<=9) return facBauman*Rci_Topbase(n, l, s, gTi, nucHe, T_g, rho);
+            if(s==1 && n<=3) return facBauman*Rci_Topbase(n, l, s, gTi, nucHe, T_g, rho);
+        }
+        else if(l==2 && n<=9) return facBauman*Rci_Topbase(n, l, s, gTi, nucHe, T_g, rho);
+
+        //===========================================================================
+        // Smith recombination coefficients without stimulated recombination
+        //===========================================================================
+        if(s==0 && ((n==4 && l==3) ||
+                    (n==5 && l==3) || (n==5 && l==4)) )
+        {
+            double Rci=Smits_Rec_Rate(n, l, s, T_g);
+            // include stimulated recombination
+            if(include_stim) Rci*=nbbp1_func(const_h_kb*nucHe/T_g);
+
+            return facSmits*Rci;
+        }
+
+        if(s==1 && ((n==4 && l==1) || (n==4 && l==3) ||
+                    (n==5 && l==1) || (n==5 && l==3) || (n==5 && l==4)) )
+        {
+            double Rci=Smits_Rec_Rate(n, l, s, T_g);
+            // include stimulated recombination
+            if(include_stim) Rci*=nbbp1_func(const_h_kb*nucHe/T_g);
+            Rci*=Get_gw(i)/3.0/(2.0*l+1.0);  // factor from j average
+
+            return facSmits*Rci;
+        }
+    }
+
+    //===============================================================================
+    // Hydrogenic coefficients
+    //===============================================================================
+    double nucH=Interaction_with_Photons_SH_QSP[n-1][l].Get_nu_ionization()*this->energy_scale;
+    double chi=nucHe/nucH;
+
+    // factor of 1/4 because of spin-states --> important for correct DB
+    return facBauman*pow(chi, 1.5)/4.0*Interaction_with_Photons_SH_QSP[n-1][l].R_c_nl_Int(T_g/chi, rho);
+}
+
+double Gas_of_HeI_Atoms::R_ci(int n, int l, int s, int j, double T_g, double rho)
+{ return R_ci(Get_Level_index(n, l, s, j), T_g, rho); }
 
 //===================================================================================
 // cross sections
 //===================================================================================
 double Gas_of_HeI_Atoms::sig_ic_Hyd(int i, double nu)
 {
-    int n=Get_n(i), l=Get_l(i), s=Get_S(i);
-    double facBauman=(Get_J(i)!=-10 && switch_Bauman ? (2.0*Get_J(i)+1.0)/(2.0*l+1.0)/(2.0*s+1.0) : 1.0)*this->sig_scale;
+    cout << " Gas_of_HeI_Atoms::sig_ic : probably should check the cross sections again... " << endl;
+
+    int n=Get_n(i), l=Get_l(i), s=Get_S(i), J=Get_J(i);
+    double facBauman=(J!=-10 && switch_Bauman ? (2.0*J+1.0)/(2.0*l+1.0)/(2.0*s+1.0) : 1.0);
+
+    facBauman*=this->sig_scale;
     nu/=this->energy_scale;
     
-    double nucHe=Get_nu_ion(i), nucH=Interaction_with_Photons_SH_QSP[n-1][l].Get_nu_ionization()*this->energy_scale;
+    double nucHe=Get_nu_ion(i);
+    double nucH=Interaction_with_Photons_SH_QSP[n-1][l].Get_nu_ionization()*this->energy_scale;
     double chi=nucHe/nucH;
+
     return facBauman*Interaction_with_Photons_SH_QSP[n-1][l].sig_phot_ion_lim(nu/chi);
 }
 
 double Gas_of_HeI_Atoms::sig_ic(int i, double nu, double Tg)
 {
+    cout << " Gas_of_HeI_Atoms::sig_ic : probably should check the cross sections again... " << endl;
     //return sig_ic_Hyd(i, nu);
     
-    int n=Get_n(i), l=Get_l(i), s=Get_S(i);
-    double facBauman=(Get_J(i)!=-10 && switch_Bauman ? (2.0*Get_J(i)+1.0)/(2.0*l+1.0)/(2.0*s+1.0) : 1.0)*this->sig_scale;
+    int n=Get_n(i), l=Get_l(i), s=Get_S(i), J=Get_J(i);
+    double facBauman=(J!=-10 && switch_Bauman ? (2.0*J+1.0)/(2.0*l+1.0)/(2.0*s+1.0) : 1.0);
+
+    facBauman*=this->sig_scale;
     nu/=this->energy_scale;
     Tg/=this->energy_scale;
     
@@ -3229,7 +3390,8 @@ double Gas_of_HeI_Atoms::sig_ic(int i, double nu, double Tg)
         if(s==0 && ((n==4 && l==3) ||
                     (n==5 && l==3) || (n==5 && l==4)) )
         {
-            double nucHe=Get_nu_ion(i), nucH=Interaction_with_Photons_SH_QSP[n-1][l].Get_nu_ionization()*this->energy_scale;
+            double nucHe=Get_nu_ion(i);
+            double nucH=Interaction_with_Photons_SH_QSP[n-1][l].Get_nu_ionization()*this->energy_scale;
             if(nu<nucHe) return 0.0;
             double chi=nucHe/nucH;
             
@@ -3248,13 +3410,15 @@ double Gas_of_HeI_Atoms::sig_ic(int i, double nu, double Tg)
                 Tg_norm_ref[index_norm]=Tg;
             }
 
-            return facBauman*Ric_norm[index_norm]*Interaction_with_Photons_SH_QSP[n-1][l].sig_phot_ion_lim(nu/chi);
+            return facBauman*Ric_norm[index_norm]
+                            *Interaction_with_Photons_SH_QSP[n-1][l].sig_phot_ion_lim(nu/chi);
         }
         
         if(s==1 && ((n==4 && l==1) || (n==4 && l==3) ||
                     (n==5 && l==1) || (n==5 && l==3) || (n==5 && l==4)) )
         {
-            double nucHe=Get_nu_ion(i), nucH=Interaction_with_Photons_SH_QSP[n-1][l].Get_nu_ionization()*this->energy_scale;
+            double nucHe=Get_nu_ion(i);
+            double nucH=Interaction_with_Photons_SH_QSP[n-1][l].Get_nu_ionization()*this->energy_scale;
             if(nu<nucHe) return 0.0;
             double chi=nucHe/nucH;
             
@@ -3275,14 +3439,16 @@ double Gas_of_HeI_Atoms::sig_ic(int i, double nu, double Tg)
                 Tg_norm_ref[index_norm]=Tg;
             }
             
-            return facBauman*Ric_norm[index_norm]*Interaction_with_Photons_SH_QSP[n-1][l].sig_phot_ion_lim(nu/chi);
+            return facBauman*Ric_norm[index_norm]
+                            *Interaction_with_Photons_SH_QSP[n-1][l].sig_phot_ion_lim(nu/chi);
         }
     }
     
     //===============================================================================
     // Hydrogenic value
     //===============================================================================
-    double nucHe=Get_nu_ion(i), nucH=Interaction_with_Photons_SH_QSP[n-1][l].Get_nu_ionization()*this->energy_scale;
+    double nucHe=Get_nu_ion(i);
+    double nucH=Interaction_with_Photons_SH_QSP[n-1][l].Get_nu_ionization()*this->energy_scale;
     double chi=nucHe/nucH;
     
     return facBauman*Interaction_with_Photons_SH_QSP[n-1][l].sig_phot_ion_lim(nu/chi);
@@ -3445,6 +3611,7 @@ void Gas_of_HeI_Atoms::rescale_gas(double alpha_scale, double me_scale)
     this->energy_scale = pow(alpha_scale,2)*me_scale;
     this->sig_scale = pow(alpha_scale,-1)*pow(me_scale,-2);
     this->rate_scale_B = pow(alpha_scale,5)*me_scale;
-    
+    this->rate_scale_alpha = pow(alpha_scale/me_scale, 2);
+
     return;
 }

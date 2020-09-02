@@ -151,7 +151,9 @@ public:
     double Ni_NeNc_LTE(double TM)  const;
     double Xi_Saha(double Xe, double Xc, double NH, double TM)  const;
     double Ni_Saha(double Ne, double Nc, double TM)  const; 
-    
+    double Ni_NeNc_LTE_expmxc(double TM) const;
+    double expmxc(double TM) const;
+
     //==============================================
     // Now we consider rescaling functions for HeI
     // Here we set rescale() and reset()
@@ -261,7 +263,9 @@ public:
     double Ni_NeNc_LTE(double TM) const;
     double Xi_Saha(double Xe, double Xc, double NH, double TM) const;
     double Ni_Saha(double Ne, double Nc, double TM) const; 
-    
+    double Ni_NeNc_LTE_expmxc(double TM) const;
+    double expmxc(double TM) const;
+
     //==============================================
     // Now we consider rescaling functions for HeI
     // Here we set rescale() and reset()
@@ -371,7 +375,9 @@ public:
     double Ni_NeNc_LTE(double TM) const;
     double Xi_Saha(double Xe, double Xc, double NH, double TM) const;
     double Ni_Saha(double Ne, double Nc, double TM) const; 
-    
+    double Ni_NeNc_LTE_expmxc(double TM) const;
+    double expmxc(double TM) const;
+
     //==============================================
     // Now we consider rescaling functions for HeI
     // Here we set rescale() and reset()
@@ -710,6 +716,7 @@ private:
     double energy_scale;
     double sig_scale;
     double rate_scale_B;
+    double rate_scale_alpha; // recombination rate scaling
     
 public:
     //===================================================================================
@@ -797,6 +804,8 @@ public:
     double Ni_NeNc_LTE(int i, double TM) const;
     double Xi_Saha(int i, double Xe, double Xc, double NH, double TM) const;
     double Ni_Saha(int i, double Ne, double Nc, double TM) const; 
+    double Ni_NeNc_LTE_expmxc(int i, double TM) const;
+    double expmxc(int i, double TM) const;
 
     //================================================================================
     // access to photoionization rates
@@ -805,10 +814,14 @@ public:
     void init_photoionization_rates(int mflag=1);
 
     double R_ic(int i, double T_g);                                     // in 1/sec
-    double R_ci(int i, double T_g);                                     // in cm^3/sec
     double R_ic(int n, int l, int s, int j, double T_g);                // in 1/sec
-    double R_ci(int n, int l, int s, int j, double T_g);                // in cm^3/sec
-    
+    double R_ci(int i, double T_g, double rho=1.0);                     // in cm^3/sec
+    double R_ci(int n, int l, int s, int j, double T_g, double rho=1.0);// in cm^3/sec
+
+    // using detailed balance with Te=Tg
+    double R_ci_DB(int i, double T_g);                                  // in cm^3/sec
+    double R_ci_DB(int n, int l, int s, int j, double T_g);             // in cm^3/sec
+
     // hydrogenic cross-section with shifted treshold energy
     double sig_ic_Hyd(int i, double nu);
     // Topbase, smith and hydrogenic cross sections corresponding to model for Ric. For
