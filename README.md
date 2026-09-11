@@ -54,3 +54,5 @@ references, including:
 These references are listed to document the origin and scientific context of
 the data and methods used here; the repository itself only provides the helium
 atom setup.
+
+These repositories were made available and documented with the help of Codex. The related release work was supported in part by a grant of access to OpenAI models through the ChatGPT for Academic Researchers program.
