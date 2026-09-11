@@ -2,6 +2,7 @@
 // Authors: Jens Chluba and Luke Hart
 // Initial version: June 2007
 //========================================================================================
+// 11.01.2022: made Voigt profile mass consistent; is not really used though [JC]
 // 01.03.2017: added scaling with alpha and me using hydrogenic approximation [LH & JC]
 // 05.10.2015: Added option to change between A_ij ~ nu^2 and nu^3 (old scaling). Also
 //             added possiblity to change the nP-nS and nS-nP series.
@@ -839,5 +840,16 @@ public:
     double get_ME_scale() const { return this->ME_scale; }
 };
 
-#endif
+//========================================================================================
+// simple approximations for 2s-1s profile and 1s ionization cross section
+//----------------------------------------------------------------------------------------
+// f_sig is used for VFC rescaling
+// frequencies are scaled by the corresponding transition frequency, y=nu/nu0
+//========================================================================================
+double sig_HeI_approx(double y, double f_sig=1.0);
+double sig_2s_1s_2gamma_approx_Hydrogenic(double y);
+double sig_2s_1s_2gamma_approx_HeI(double y);
 
+#endif
+//========================================================================================
+//========================================================================================

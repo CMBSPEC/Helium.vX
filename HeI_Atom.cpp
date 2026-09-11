@@ -2,6 +2,7 @@
 // Authors: Jens Chluba and Luke Hart
 // Initial version: June 2007
 //========================================================================================
+// 11.01.2022: made Voigt profile mass consistent; is not really used though [JC]
 // 01.03.2017: added scaling with alpha and me using hydrogenic approximation [LH & JC]
 // 05.10.2015: Added option to change between A_ij ~ nu^2 and nu^3 (old scaling). Also
 //             added possiblity to change the nP-nS and nS-nP series.
@@ -2614,7 +2615,7 @@ void Gas_of_HeI_Atoms::voigt_init(int nS, int mflag)
                           << nu21 << " " << lam21 << " " << A21 << " "
                           << Gamma << " " << f << endl;
         
-        phi_HeI_nP_S[n].Set_atomic_data_Gamma(nu21, lam21, A21, f, Gamma, 4);
+        phi_HeI_nP_S[n].Set_atomic_data_Gamma(nu21, lam21, A21, f, Gamma, const_malpha_mp);
     }
     
     //===========================================================
@@ -2635,7 +2636,7 @@ void Gas_of_HeI_Atoms::voigt_init(int nS, int mflag)
                           << nu21 << " " << lam21 << " " << A21 << " "
                           << Gamma << " " << f << endl;
         
-        phi_HeI_nP_T[n].Set_atomic_data_Gamma(nu21, lam21, A21, f, Gamma, 4);
+        phi_HeI_nP_T[n].Set_atomic_data_Gamma(nu21, lam21, A21, f, Gamma, const_malpha_mp);
     }
     
     //===========================================================
@@ -2656,7 +2657,7 @@ void Gas_of_HeI_Atoms::voigt_init(int nS, int mflag)
                           << nu21 << " " << lam21 << " " << A21 << " "
                           << Gamma << " " << f << endl;
         
-        phi_HeI_nD_S[n].Set_atomic_data_Gamma(nu21, lam21, A21, f, Gamma, 4);
+        phi_HeI_nD_S[n].Set_atomic_data_Gamma(nu21, lam21, A21, f, Gamma, const_malpha_mp);
     }
 
     return;
@@ -3615,3 +3616,38 @@ void Gas_of_HeI_Atoms::rescale_gas(double alpha_scale, double me_scale)
 
     return;
 }
+
+//========================================================================================
+// simple approximations for 2s-1s profile and 1s ionization cross section
+//----------------------------------------------------------------------------------------
+// f_sig is used for VFC rescaling
+// frequencies are scaled by the corresponding transition frequency, y=nu/nu0
+//========================================================================================
+double sig_HeI_approx(double y, double f_sig)
+{
+    if(y<1.0 || y>30.0) return 0.0;
+    // fit to cross section with resonances
+    return 7.1922e-18*f_sig*pow(y, -1.436)/(1.0+0.222*y*pow(log(y), 1.352) );
+}
+
+//========================================================================================
+// hydrogenic atom
+//========================================================================================
+double sig_2s_1s_2gamma_approx_Hydrogenic(double y)
+{
+    double C=12.27805412369786;
+    double a=0.88, b=1.53, g=0.8, w=y*(1.0-y);
+    return 2.0*C*(w*(1.0-pow(4.0*w, g)) + a*pow(w, b)*pow(4.0*w, g));
+}
+
+//========================================================================================
+// neutral helium atom
+//========================================================================================
+double sig_2s_1s_2gamma_approx_HeI(double y)
+{
+    double w=y*(1.0-y);
+    return 19.6039602*pow(w, 3)*( 1.742-7.2*w+12.8*w*w)/pow(w+0.03, 2);
+}
+
+//========================================================================================
+//========================================================================================
