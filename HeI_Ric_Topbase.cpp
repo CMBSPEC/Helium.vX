@@ -111,6 +111,56 @@ struct TopBase_Level_data
 vector<TopBase_Level_data> TopBase_Level_data_S;
 vector<TopBase_Level_data> TopBase_Level_data_T;
 
+const int nTopBase_Levels_S=sizeof(TopBase_Levels_S)/sizeof(TopBase_Levels_S[0]);
+const int nTopBase_Levels_T=sizeof(TopBase_Levels_T)/sizeof(TopBase_Levels_T[0]);
+
+static void check_Topbase_data_loaded(const vector<TopBase_Level_data> &TD, int expected, int s)
+{
+    if((int)TD.size()!=expected)
+    {
+        cerr << " Topbase data for s=" << s << " has not been loaded correctly. "
+             << "Expected " << expected << " tables but found " << TD.size()
+             << ". Exiting... " << endl;
+        exit(0);
+    }
+
+    return;
+}
+
+static int find_Topbase_level_index(int n, int l, int s)
+{
+    const TopBase_Level *levels=NULL;
+    int nlevels=0;
+
+    if(s==0)
+    {
+        check_Topbase_data_loaded(TopBase_Level_data_S, nTopBase_Levels_S, s);
+        levels=TopBase_Levels_S;
+        nlevels=nTopBase_Levels_S;
+    }
+    else if(s==1)
+    {
+        check_Topbase_data_loaded(TopBase_Level_data_T, nTopBase_Levels_T, s);
+        levels=TopBase_Levels_T;
+        nlevels=nTopBase_Levels_T;
+    }
+    else
+    {
+        cerr << " no Topbase data found for (n, l, s) == ("
+             << n << ", " << l << ", " << s << ")! Exiting... " << endl;
+        exit(0);
+    }
+
+    for(int i=0; i<nlevels; i++)
+        if(levels[i].n==n && levels[i].l==l) return i;
+
+    cerr << " no Topbase data found for (n, l, s) == ("
+         << n << ", " << l << ", " << s << ")! Exiting... " << endl;
+    exit(0);
+
+    return 0;
+}
+
 //===========================================================================================================
 //
 // load Topbase data
@@ -122,34 +172,53 @@ void load_Topbase_data(string fname, double Ec, vector<TopBase_Level_data> &TD)
     {
         cout << " *****************************************************************" << endl;
         cout << " reading from file: " << fname << endl;
-        
+
         Ec*=const_Ry_inf_icm*const_cl;                         // conversion E/Ryd --> Hz
         cout << " Ec: " << Ec << endl;
     }
-    
+
     ifstream file(fname.c_str());
+    if(!file.is_open())
+    {
+        cerr << " could not open Topbase data file: " << fname << ". Exiting... " << endl;
+        exit(0);
+    }
+
     string str;
     TopBase_Level_data dum;
-    
-    char *pEnd;
+
+    char *pEnd, *pEnd2;
     double d1, d2;
-    
+
     // read the data
-    while(!file.eof())
+    while(getline(file, str))
     {
-        getline(file, str);
-        
         d1= strtod(str.c_str(), &pEnd);
-        d2= strtod(pEnd,NULL);
-        
+        if(pEnd==str.c_str()) continue;
+
+        d2= strtod(pEnd, &pEnd2);
+        if(pEnd2==pEnd) continue;
+
+        if(d1<=0.0 || d2<0.0)
+        {
+            cerr << " invalid Topbase data in file: " << fname << ". Exiting... " << endl;
+            exit(0);
+        }
+
         dum.lgnu_Hz.push_back(log(d1*const_Ry_inf_icm*const_cl));  // conversion E/Ryd --> Hz
         // some of the table values are ==0.0 so make sure to not have that...
         dum.lgsig_ic.push_back(log(d2*1.0e-18+1.0e-300));          // conversion Mbarn --> cm^2
     }
-    
+
+    if(dum.lgnu_Hz.size()<2)
+    {
+        cerr << " insufficient Topbase data in file: " << fname << ". Exiting... " << endl;
+        exit(0);
+    }
+
     TD.push_back(dum);
     file.close();
-    
+
     return;
 }
 
@@ -159,11 +228,11 @@ void load_all_Topbase_data(string path)
     TopBase_Level_data_T.clear();
     
     // Singlet-states
-    for(int i=0; i<25; i++)
+    for(int i=0; i<nTopBase_Levels_S; i++)
         load_Topbase_data(path+TopBase_Levels_S[i].fname, TopBase_Levels_S[i].Ec, TopBase_Level_data_S);
 
     // Triplet-states
-    for(int i=0; i<18; i++)
+    for(int i=0; i<nTopBase_Levels_T; i++)
         load_Topbase_data(path+TopBase_Levels_T[i].fname, TopBase_Levels_T[i].Ec, TopBase_Level_data_T);
 
     return;
@@ -176,9 +245,11 @@ double interpolate_Topbase(double lgnu,
                                long unsigned int np)
 {
     long unsigned int j=0;
+    if(np<2) throw_error("interpolate_Topbase", "insufficient data", 1);
+
     // find index corresponding to x (start at i=istart)
     locate_JC(&lgnu_Hz[0], np, lgnu, &j);
-    if(j<0 || j==np-1) throw_error("interpolate_Topbase", "out of bound", 1);
+    if(j==np-1) throw_error("interpolate_Topbase", "out of bound", 1);
 
     double dlnsig_dln_nu=(lgsig[j+1]-lgsig[j])/(lgnu_Hz[j+1]-lgnu_Hz[j]);
 
@@ -192,13 +263,10 @@ double interpolate_Topbase(double lgnu,
 //===========================================================================================================
 double sig_ic_Topbase(int n, int l, int s, double nu)
 {
-    int i;
+    int i=find_Topbase_level_index(n, l, s);
 
     if(s==0)
     {
-        for(i=0; i<(int)TopBase_Level_data_S.size(); i++)
-            if(TopBase_Levels_S[i].n==n && TopBase_Levels_S[i].l==l) break;
-
         if(TopBase_Levels_S[i].Ec*const_Ry_inf_icm*const_cl>nu) return 0;
 
         return interpolate_Topbase(log(nu),
@@ -206,11 +274,8 @@ double sig_ic_Topbase(int n, int l, int s, double nu)
                                 TopBase_Level_data_S[i].lgsig_ic,
                                 TopBase_Level_data_S[i].lgnu_Hz.size());
     }
-    else if(s==1)
+    else
     {
-        for(i=0; i<(int)TopBase_Level_data_T.size(); i++)
-            if(TopBase_Levels_T[i].n==n && TopBase_Levels_T[i].l==l) break;
-
         if(TopBase_Levels_T[i].Ec*const_Ry_inf_icm*const_cl>nu) return 0;
 
         return interpolate_Topbase(log(nu),
@@ -218,9 +283,6 @@ double sig_ic_Topbase(int n, int l, int s, double nu)
                                        TopBase_Level_data_T[i].lgsig_ic,
                                        TopBase_Level_data_T[i].lgnu_Hz.size());
     }
-    else{ cerr << " no Topbase data found for (n, l, s) == ("
-               << n << ", " << l << ", " << s << ")! Exiting... " << endl; exit(0); }
-
     return 0.0;
 }
 
@@ -288,23 +350,11 @@ double integrate_Ric(const TopBase_Level_data &TD, double Ec, double nucHe, doub
 //===========================================================================================================
 double Ric_Topbase(int n, int l, int s, double nucHe, double Tg)
 {
-    int i;
+    int i=find_Topbase_level_index(n, l, s);
     if(s==0)
-    {
-        for(i=0; i<(int)TopBase_Level_data_S.size(); i++)
-            if(TopBase_Levels_S[i].n==n && TopBase_Levels_S[i].l==l) break;
-        
         return integrate_Ric(TopBase_Level_data_S[i], TopBase_Levels_S[i].Ec, nucHe, Tg);
-    }
-    else if(s==1)
-    {
-        for(i=0; i<(int)TopBase_Level_data_T.size(); i++)
-            if(TopBase_Levels_T[i].n==n && TopBase_Levels_T[i].l==l) break;
-        
+    else
         return integrate_Ric(TopBase_Level_data_T[i], TopBase_Levels_T[i].Ec, nucHe, Tg);
-    }
-    else{ cerr << " no Topbase data found for (n, l, s) == ("
-               << n << ", " << l << ", " << s << ")! Exiting... " << endl; exit(0); }
     
     return 0.0;
 }
@@ -370,23 +420,11 @@ double integrate_Ici(const TopBase_Level_data &TD, double Ec, double nucHe, doub
 //===========================================================================================================
 double Ici_Topbase(int n, int l, int s, double nucHe, double Tg, double rho)
 {
-    int i;
+    int i=find_Topbase_level_index(n, l, s);
     if(s==0)
-    {
-        for(i=0; i<(int)TopBase_Level_data_S.size(); i++)
-            if(TopBase_Levels_S[i].n==n && TopBase_Levels_S[i].l==l) break;
-
         return integrate_Ici(TopBase_Level_data_S[i], TopBase_Levels_S[i].Ec, nucHe, Tg, rho);
-    }
-    else if(s==1)
-    {
-        for(i=0; i<(int)TopBase_Level_data_T.size(); i++)
-            if(TopBase_Levels_T[i].n==n && TopBase_Levels_T[i].l==l) break;
-
+    else
         return integrate_Ici(TopBase_Level_data_T[i], TopBase_Levels_T[i].Ec, nucHe, Tg, rho);
-    }
-    else{ cerr << " no Topbase data found for (n, l, s) == ("
-               << n << ", " << l << ", " << s << ")! Exiting... " << endl; exit(0); }
 
     return 0.0;
 }

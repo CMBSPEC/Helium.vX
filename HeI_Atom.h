@@ -33,6 +33,7 @@
 // collection of all the levels and their properties
 //========================================================================================
 #include <vector>
+#include <string>
 #include "physical_consts.h"
 #include "File.h"
 #include "Voigtprofiles.h"
@@ -40,6 +41,13 @@
 #include "Photoionization_cross_section.h"
 
 using namespace std;
+
+//========================================================================================
+// Location of the Helium.Data directory. The default remains HEIDATADIR + ./Helium.Data/
+// or ./Helium.Data/ when HEIDATADIR is not defined.
+//========================================================================================
+void set_HeI_data_path(string data_path);
+string get_HeI_data_path();
 
 struct Transition_Data_HeI_A
 {
@@ -689,6 +697,7 @@ private:
     int nl;                         // total number of levels
     int njresolved;
     int n_HeI_add_Intercomb, n_HeI_add_Quad;
+    string data_path;
     bool add_Q_lines_loaded, add_TS_lines_loaded;
     
     void check_transition_data();
@@ -725,11 +734,17 @@ public:
     //===================================================================================
     Gas_of_HeI_Atoms();
     Gas_of_HeI_Atoms(int nS, int njres, int mflag=1);
+    Gas_of_HeI_Atoms(int nS, int njres, string data_path, int mflag=1);
     // load additional quadrupole and Triplet-singlet transitions nQ<=10 && nTS<=10
     Gas_of_HeI_Atoms(int nS, int njres, int nQ, int nTS, int mflag=1);
+    Gas_of_HeI_Atoms(int nS, int njres, int nQ, int nTS, string data_path, int mflag=1);
     ~Gas_of_HeI_Atoms();
     void init(int nS, int njres, int mflag=1); 
+    void init(int nS, int njres, string data_path, int mflag=1);
     void init(int nS, int njres, int nQ, int nTS, int mflag=1);
+    void init(int nS, int njres, int nQ, int nTS, string data_path, int mflag=1);
+    void Set_data_path(string data_path);
+    string Get_data_path() const { return data_path; }
     
     Atom_HeI_Singlet Sing;
     Atom_HeI_Triplet Trip;

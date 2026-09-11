@@ -59,7 +59,26 @@ const double He1s2_ion=198310.6690*const_cl*const_h/const_e;
 #define HEIDATA ((string)"")
 #endif
 
-const string path=HEIDATA+"./Helium.Data/";
+static string default_HeI_data_path()
+{ return HEIDATA+"./Helium.Data/"; }
+
+static string normalize_HeI_data_path(string data_path)
+{
+    if(data_path.empty()) data_path=default_HeI_data_path();
+    if(data_path[data_path.size()-1]!='/') data_path+="/";
+    return data_path;
+}
+
+static string path=default_HeI_data_path();
+
+void set_HeI_data_path(string data_path)
+{
+    path=normalize_HeI_data_path(data_path);
+    return;
+}
+
+string get_HeI_data_path()
+{ return path; }
 
 //===================================================================================
 // Rydberg for hydrogenic levels in neutral helium
@@ -79,21 +98,21 @@ const double rescale_nS_nP=1.0; // 2.2; // change Singlet nS --> nP series
 //===================================================================================
 // files for transition rates and energies from Drake & Morton
 //===================================================================================
-const string nameA_SS=path+"He4_SS.dat";
-const string nameA_TS=path+"He4_TS.dat";
-const string nameA_TT=path+"He4_TT.dat";
-const string nameA_ST=path+"He4_ST.dat";
-const string nameA_add=path+"He4_add.dat";
+static string nameA_SS() { return path+"He4_SS.dat"; }
+static string nameA_TS() { return path+"He4_TS.dat"; }
+static string nameA_TT() { return path+"He4_TT.dat"; }
+static string nameA_ST() { return path+"He4_ST.dat"; }
+static string nameA_add() { return path+"He4_add.dat"; }
 
 //===================================================================================
 // 25th May 2009: added other n^3 P_1 - 1^1 S_0 intecombination lines for 3<=n<=10
 //===================================================================================
-const string nameA_add_Int=path+"He4_add.intercombination_lines.dat";
+static string nameA_add_Int() { return path+"He4_add.intercombination_lines.dat"; }
 
 //===================================================================================
 // 30th May 2009: added n^1D_2-1^1S_0 quadrupole lines for 3<=n<=10 
 //===================================================================================
-const string nameA_add_Quad=path+"He4_Quadrupole_lines.dat";
+static string nameA_add_Quad() { return path+"He4_Quadrupole_lines.dat"; }
 
 //===================================================================================
 // do not change these global variables!
@@ -639,7 +658,7 @@ void Electron_Level_HeI_Singlet::init(int n, int l, int mflag)
     else if((nn==9 && ll==8) || (nn==10 && ll==7) || (nn==10 && ll==8) || (nn==10 && ll==9)) 
         DE=He1s2_ion-const_EHeI/nn/nn;
     // the rest is in Drake & Morton
-    else read_level_energy_DM(nameA_SS, nn, ll, 0, ll, DE);
+    else read_level_energy_DM(nameA_SS(), nn, ll, 0, ll, DE);
     //===============================================================================
     
     if(DE==-6000.0){ Dnu=Eion=Eion_ergs=nuion=0.0; cout << " BAAAADDD " << endl; }
@@ -656,12 +675,12 @@ void Electron_Level_HeI_Singlet::init(int n, int l, int mflag)
         if(HeI_Atom_read_transition_data==1)
         {
             // set Drake and Morton values
-            read_transition_inf(nameA_SS, nn, ll, 0, ll, A_values);
-            read_transition_inf(nameA_TS, nn, ll, 0, ll, A_values);
-            read_transition_inf(nameA_add, nn, ll, 0, ll, A_values);
+            read_transition_inf(nameA_SS(), nn, ll, 0, ll, A_values);
+            read_transition_inf(nameA_TS(), nn, ll, 0, ll, A_values);
+            read_transition_inf(nameA_add(), nn, ll, 0, ll, A_values);
 
             if(_HeI_add_Quad>=nn && ll==2)
-                read_transition_add_Quadrupole(nameA_add_Quad, nn, ll, 0, ll, A_values, mflag);
+                read_transition_add_Quadrupole(nameA_add_Quad(), nn, ll, 0, ll, A_values, mflag);
         }
     }
     
@@ -1005,12 +1024,12 @@ void Electron_Level_HeI_Triplet::init(int n, int l, int j, int mflag)
     if(ll<=6 && nn>10 && nn<=30) DE=He1s2_ion-compute_DEc_QD(nn, ll, 1, jj);
     // hydrogenic energies
     else if((ll>6 && nn>10) || (ll<=6 && nn>30)) DE=He1s2_ion-const_EHeI/nn/nn;
-    else if((nn==8 && ll==7 && jj==6)) read_level_energy_DM(nameA_TS, nn, ll, 1, jj, DE);
+    else if((nn==8 && ll==7 && jj==6)) read_level_energy_DM(nameA_TS(), nn, ll, 1, jj, DE);
     else if((nn==8 && ll==7) || (nn==9 && ll==8) || 
             (nn==10 && ll==7)|| (nn==10 && ll==8)|| (nn==10 && ll==9)) DE=He1s2_ion-const_EHeI/nn/nn;
     //
     // the rest is in Drake & Morton
-    else read_level_energy_DM(nameA_TT, nn, ll, 1, jj, DE);
+    else read_level_energy_DM(nameA_TT(), nn, ll, 1, jj, DE);
     //===============================================================================
     
     if(DE==-6000.0){ Dnu=Eion=Eion_ergs=nuion=0.0; cout << " BAAAADDD " << endl; }
@@ -1027,11 +1046,11 @@ void Electron_Level_HeI_Triplet::init(int n, int l, int j, int mflag)
         if(HeI_Atom_read_transition_data==1)
         {
             // set Drake and Morton values (j-resolved)
-            read_transition_inf(nameA_TT, nn, ll, 1, jj, A_values);
-            read_transition_inf(nameA_ST, nn, ll, 1, jj, A_values);
-            read_transition_inf(nameA_add, nn, ll, 1, jj, A_values);
+            read_transition_inf(nameA_TT(), nn, ll, 1, jj, A_values);
+            read_transition_inf(nameA_ST(), nn, ll, 1, jj, A_values);
+            read_transition_inf(nameA_add(), nn, ll, 1, jj, A_values);
             if(_HeI_add_Intercomb>=nn && nn>2 && ll==1 && jj==1)
-                read_transition_add_TS(nameA_add_Int, nn, ll, 1, jj, A_values, mflag); 
+                read_transition_add_TS(nameA_add_Int(), nn, ll, 1, jj, A_values, mflag);
         }
     }
     
@@ -2517,8 +2536,18 @@ Electron_Level_HeI_Triplet_no_j& Atom_HeI_Triplet_no_j::Level(int n, int l)
 //===================================================================================
 // Konstructors and Destructors for class: Gas_of_HeI_Atoms
 //===================================================================================
+void Gas_of_HeI_Atoms::Set_data_path(string data_path)
+{
+    this->data_path=normalize_HeI_data_path(data_path);
+    set_HeI_data_path(this->data_path);
+    return;
+}
+
 void Gas_of_HeI_Atoms::init(int nS, int njres, int nQ, int nTS, int mflag)
 { 
+    if(data_path.empty()) data_path=get_HeI_data_path();
+    set_HeI_data_path(data_path);
+
     //===============================================================================
     // do not read transition data but only energies!
     //===============================================================================
@@ -2663,10 +2692,14 @@ void Gas_of_HeI_Atoms::voigt_init(int nS, int mflag)
     return;
 }
 
-Gas_of_HeI_Atoms::Gas_of_HeI_Atoms(){}
+Gas_of_HeI_Atoms::Gas_of_HeI_Atoms()
+{ Set_data_path(get_HeI_data_path()); }
 
 Gas_of_HeI_Atoms::Gas_of_HeI_Atoms(int nS, int njres, int mflag)
 { init(nS, njres, 0, 0, mflag); }
+
+Gas_of_HeI_Atoms::Gas_of_HeI_Atoms(int nS, int njres, string data_path, int mflag)
+{ init(nS, njres, data_path, mflag); }
 
 void Gas_of_HeI_Atoms::init(int nS, int njres, int mflag)
 {
@@ -2674,8 +2707,25 @@ void Gas_of_HeI_Atoms::init(int nS, int njres, int mflag)
     return;
 }
 
+void Gas_of_HeI_Atoms::init(int nS, int njres, string data_path, int mflag)
+{
+    Set_data_path(data_path);
+    init(nS, njres, 0, 0, mflag);
+    return;
+}
+
 Gas_of_HeI_Atoms::Gas_of_HeI_Atoms(int nS, int njres, int nQ, int nTS, int mflag)
 { init(nS, njres, nQ, nTS, mflag); }
+
+Gas_of_HeI_Atoms::Gas_of_HeI_Atoms(int nS, int njres, int nQ, int nTS, string data_path, int mflag)
+{ init(nS, njres, nQ, nTS, data_path, mflag); }
+
+void Gas_of_HeI_Atoms::init(int nS, int njres, int nQ, int nTS, string data_path, int mflag)
+{
+    Set_data_path(data_path);
+    init(nS, njres, nQ, nTS, mflag);
+    return;
+}
 
 
     
@@ -3167,7 +3217,8 @@ void Gas_of_HeI_Atoms::init_photoionization_rates(int mflag)
     if(mflag>0) cout << " Gas_of_HeI_Atoms::init_photoionization_rates: done with hydrogenic " << endl;
     
     // topbase data
-    load_all_Topbase_data(path+"TopBase_data/");
+    if(data_path.empty()) Set_data_path(get_HeI_data_path());
+    load_all_Topbase_data(data_path+"TopBase_data/");
     
     if(mflag>0) cout << " Gas_of_HeI_Atoms::init_photoionization_rates: done with Topbase " << endl;
     
