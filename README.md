@@ -28,7 +28,8 @@ code from the surrounding CMBSPEC/CosmoSpec/CosmoTherm toolchains, including
 physical constants, file I/O helpers, interpolation/integration routines, Voigt
 profiles, hydrogenic bound-bound and photoionization routines.
 
-A small external demonstration project, `Helium-demo`, will show the minimal
+A small external demonstration project,
+[Helium-demo](https://github.com/CMBSPEC/Helium-demo), will show the minimal
 set of required Tools and a concrete build/use example.
 
 ## Related Literature And Data Sources
