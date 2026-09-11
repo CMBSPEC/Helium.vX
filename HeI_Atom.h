@@ -51,6 +51,13 @@ string get_HeI_data_path();
 
 struct Transition_Data_HeI_A
 {
+  Transition_Data_HeI_A()
+  {
+      np=lp=sp=jp=0;
+      gwp=Dnu=DE=A21=lambda21=0.0;
+      for(int i=0; i<5; i++) xxx[i]=0.0;
+  }
+
   int np, lp, sp, jp;        // transition (nn, ll) --> (np, lp)
   double gwp;                // weight of level 
   double Dnu;                // transition frequency
@@ -109,7 +116,11 @@ private:
 
 public:
     //Konstructors and Destructors
-    Electron_Level_HeI_Singlet(){}
+    Electron_Level_HeI_Singlet()
+        : nn(0), ll(0), mess_flag(0), gw(0.0), Dnu(0.0), DE(0.0),
+          nuion(0.0), Eion(0.0), Eion_ergs(0.0), FSC_scale(1.0),
+          ME_scale(1.0), Xi(0.0), Ric(0.0)
+    {}
     Electron_Level_HeI_Singlet(int n, int l, int mflag=1);   
     ~Electron_Level_HeI_Singlet();
     void init(int n, int l, int mflag=1);        
@@ -220,7 +231,11 @@ private:
 
 public:
     //Konstructors and Destructors
-    Electron_Level_HeI_Triplet(){}
+    Electron_Level_HeI_Triplet()
+        : nn(0), ll(0), jj(0), mess_flag(0), gw(0.0), Dnu(0.0),
+          DE(0.0), nuion(0.0), Eion(0.0), Eion_ergs(0.0),
+          FSC_scale(1.0), ME_scale(1.0), Xi(0.0), Ric(0.0)
+    {}
     Electron_Level_HeI_Triplet(int n, int l, int j, int mflag=1);   
     ~Electron_Level_HeI_Triplet();
     void init(int n, int l, int j, int mflag=1);        
@@ -333,7 +348,11 @@ private:
 
 public:
     //Konstructors and Destructors
-    Electron_Level_HeI_Triplet_no_j(){}
+    Electron_Level_HeI_Triplet_no_j()
+        : nn(0), ll(0), njresolved(0), mess_flag(0), gw(0.0), Dnu(0.0),
+          DE(0.0), nuion(0.0), Eion(0.0), Eion_ergs(0.0),
+          FSC_scale(1.0), ME_scale(1.0), Xi(0.0), Ric(0.0)
+    {}
     Electron_Level_HeI_Triplet_no_j(int n, int l, int njres, int mflag=1);
     ~Electron_Level_HeI_Triplet_no_j();
     void init(int n, int l, int njres, int mflag=1);
@@ -414,7 +433,9 @@ private:
 
 public:
     //Konstructors and Destructors
-    Atomic_Shell_HeI_Singlet(){}
+    Atomic_Shell_HeI_Singlet()
+        : nn(0), mess_flag(0)
+    {}
     Atomic_Shell_HeI_Singlet(int n, int mflag=1);
     ~Atomic_Shell_HeI_Singlet();
     void init(int n, int mflag=1);
@@ -448,7 +469,9 @@ private:
 
 public:
     //Konstructors and Destructors
-    Atomic_Shell_HeI_Triplet(){}
+    Atomic_Shell_HeI_Triplet()
+        : nn(0), mess_flag(0)
+    {}
     Atomic_Shell_HeI_Triplet(int n, int mflag=1);
     ~Atomic_Shell_HeI_Triplet();
     void init(int n, int mflag=1);
@@ -483,7 +506,9 @@ private:
 
 public:
     //Konstructors and Destructors
-    Atomic_Shell_HeI_Triplet_no_j(){}
+    Atomic_Shell_HeI_Triplet_no_j()
+        : nn(0), njresolved(0), mess_flag(0)
+    {}
     Atomic_Shell_HeI_Triplet_no_j(int n, int njres, int mflag=1);
     ~Atomic_Shell_HeI_Triplet_no_j();
     void init(int n, int njres, int mflag=1);
